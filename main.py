@@ -23,15 +23,12 @@ running = True
 while running: 
 
     # *--INPUT DETECTION--*
-    
     for event in pygame.event.get(): #just detects if any 'events' occur
-
 
         # *--QUIT--*
         if event.type == pygame.QUIT:
             pygame.quit()
             sys.exit()
-
 
         # *--KEY DETECTION--*
 
@@ -57,9 +54,7 @@ while running:
             if event.key == pygame.K_a: #let go of A (left)
                 moving_left = False
 
-    screen.fill((0,0,0))
-    screen.blit(player_sprite, player_location)
-
+    # *--PLAYER MOVEMENT--*
     if moving_up == True:
         player_location[1] -= 4 
     if moving_down == True:
@@ -69,7 +64,8 @@ while running:
     if moving_left == True:
         player_location[0] -= 4
 
-
+    screen.fill((0,0,0)) #fills the background with black
+    screen.blit(player_sprite, player_location) #draws the player onto the screen with its corresponding location
 
     pygame.display.update() #updates the screen
     clock.tick(60) #ensures framerate is consistently 60fps
