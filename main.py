@@ -5,7 +5,7 @@ clock = pygame.time.Clock() #assigning the clock function to a variable to use f
 #1. initiliaze pygame, 2. names the window, 3. sets the window size and sets its paramaters
 pygame.init()
 pygame.display.set_caption("Return To Sender") 
-screen = pygame.display.set_mode((0,0)) # (0,0) means it will fit whatever screen its displayed on, might change later due to technical issues
+screen = pygame.display.set_mode((1920,1080)) # (0,0) means it will fit whatever screen its displayed on, might change later due to technical issues
 
 
 
@@ -22,21 +22,9 @@ moving_left = False
 running = True
 while running: 
 
-    screen.blit(player_sprite, player_location)
-
-    if moving_up == True:
-        player_location[1] += 4 
-    if moving_down == True:
-        player_location[1] -= 4
-    if moving_right == True:
-        player_location[0] += 4
-    if moving_left == True:
-        player_location[0] -= 4
-
-
     # *--INPUT DETECTION--*
-
-    for event in pygame.event.get(): #event loop
+    
+    for event in pygame.event.get(): #just detects if any 'events' occur
 
 
         # *--QUIT--*
@@ -69,8 +57,17 @@ while running:
             if event.key == pygame.K_a: #let go of A (left)
                 moving_left = False
 
-            
+    screen.fill((0,0,0))
+    screen.blit(player_sprite, player_location)
 
+    if moving_up == True:
+        player_location[1] -= 4 
+    if moving_down == True:
+        player_location[1] += 4
+    if moving_right == True:
+        player_location[0] += 4
+    if moving_left == True:
+        player_location[0] -= 4
 
 
 
