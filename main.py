@@ -24,7 +24,7 @@ while True:
             pygame.quit()
             sys.exit()
 
-    canvas.fill((255,255,255))
+    canvas.fill((159, 215, 255))
     map.draw_map(canvas)
     screen.blit(canvas,(0,0))
     pygame.display.update()

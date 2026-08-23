@@ -29,6 +29,7 @@ class TileMap():
 
     def draw_map(self, surface):
         surface.blit(self.map_surface, (0,0))
+        
     def load_map(self):
         for tile in self.tiles:
             tile.draw(self.map_surface)
@@ -57,7 +58,7 @@ class TileMap():
                     map_x = x*self.tile_size
                     map_y = y*self.tile_size
 
-                    tile_num = int(tile_id)
+                    tile_num = int(tile_id)+1
                     sprite_name = f"tile{tile_num:02d}"
 
                     tiles.append(Tile(sprite_name, map_x, map_y, self.spritesheet))

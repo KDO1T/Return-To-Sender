@@ -17,7 +17,8 @@ class Spritesheet:
         return sprite
 #PARSING SPRITE TO BE USED
     def parse_sprite(self,name):
-        sprite = self.data['frames'][name]['frame']
+        frame_data = self.data['frames'][name]
+        sprite = frame_data['frame']
         x,y,w,h = sprite["x"],sprite["y"],sprite["w"],sprite["h"]
         image = self.get_sprite(x,y,w,h)
         return image
