@@ -16,11 +16,21 @@ moving_up = False
 moving_down = False
 moving_right = False
 moving_left = False
+player_rect = pygame.Rect(player_location[0], player_location[1], player_sprite.get_width(), player_sprite.get_height()) #player hitbox
+
+touching_object = True
+object_rect = pygame.Rect(300, 300, 250,250)
 
 
+
+
+
+#note for rendering: whatever is first rendered in the loop will be behind while whatever is last rendered in the loop will be in the very front
 # *--GAME LOOP--*
 running = True
 while running: 
+
+    screen.fill((255,255,255)) #fills the background with white
 
     # *--INPUT DETECTION--*
     for event in pygame.event.get(): #just detects if any 'events' occur
@@ -64,7 +74,19 @@ while running:
     if moving_left == True:
         player_location[0] -= 4
 
-    screen.fill((0,0,0)) #fills the background with black
+
+    
+    # *--PLAYER HITBOX--*
+    player_rect.x = player_location[0]
+    player_rect.y = player_location[1]
+
+    if player_rect.colliderect(object_rect):
+        pygame.draw.rect(screen, (255,0,0), object_rect)
+        pygame.mixer.music.load("huh_sfx.mp3")
+        pygame.mixer.music.play()
+    else: 
+        pygame.draw.rect(screen, (0, 255, 0), object_rect)
+
     screen.blit(player_sprite, player_location) #draws the player onto the screen with its corresponding location
 
     pygame.display.update() #updates the screen
