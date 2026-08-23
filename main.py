@@ -5,12 +5,12 @@ clock = pygame.time.Clock() #assigning the clock function to a variable to use f
 #1. initiliaze pygame, 2. names the window, 3. sets the window size and sets its paramaters
 pygame.init()
 pygame.display.set_caption("Return To Sender") 
-screen = pygame.display.set_mode((1920,1080)) # fixed resolution, might change later due to technical issues
+screen = pygame.display.set_mode((0,0)) # fixed resolution, might change later due to technical issues
 
 
 
 # *--PLAYER STUFF--*
-player_sprite = pygame.image.load('picture test.png')
+player_sprite = pygame.image.load('sprites/jimmy.png')
 player_location = [500,500]
 moving_up = False
 moving_down = False
