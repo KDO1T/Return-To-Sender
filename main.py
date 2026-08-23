@@ -13,7 +13,7 @@ screen = pygame.display.set_mode(window_size) # fixed resolution, might change l
 
 # *--PLAYER STUFF--*
 player_sprite = pygame.image.load('sprites/jimmy.png')
-player_location = [500,500]
+player_location = [250,250]
 moving_up = False
 moving_down = False
 moving_right = False
@@ -23,7 +23,6 @@ player_rect = pygame.Rect(player_location[0], player_location[1], player_sprite.
 object_rect = pygame.Rect(300, 300, 250,250)
 
 #floor object
-
 floor_rect = pygame.Rect(0, window_size[1]-50, window_size[0], 50)
 
 
