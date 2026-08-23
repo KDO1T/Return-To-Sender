@@ -5,7 +5,9 @@ clock = pygame.time.Clock() #assigning the clock function to a variable to use f
 #1. initiliaze pygame, 2. names the window, 3. sets the window size and sets its paramaters
 pygame.init()
 pygame.display.set_caption("Return To Sender") 
-screen = pygame.display.set_mode((0,0)) # fixed resolution, might change later due to technical issues
+
+window_size = (1000, 500)
+screen = pygame.display.set_mode(window_size) # fixed resolution, might change later due to technical issues
 
 
 
@@ -18,9 +20,11 @@ moving_right = False
 moving_left = False
 player_rect = pygame.Rect(player_location[0], player_location[1], player_sprite.get_width(), player_sprite.get_height()) #player hitbox
 
-
 object_rect = pygame.Rect(300, 300, 250,250)
 
+#floor object
+
+floor_rect = pygame.Rect(0, window_size[1]-50, window_size[0], 50)
 
 
 
@@ -86,6 +90,7 @@ while running:
     else:
         pygame.draw.rect(screen, (0, 255, 0), object_rect)
 
+    pygame.draw.rect(screen, (0,255,0), floor_rect)
 
     screen.blit(player_sprite, player_location) #draws the player onto the screen with its corresponding location
 
