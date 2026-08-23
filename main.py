@@ -19,6 +19,7 @@ moving_down = False
 moving_right = False
 moving_left = False
 player_rect = pygame.Rect(player_location[0], player_location[1], player_sprite.get_width(), player_sprite.get_height()) #player hitbox
+player_y_momentum = 0 # <-- gravity enacted on the player
 
 object_rect = pygame.Rect(300, 300, 250,250)
 
@@ -36,6 +37,14 @@ running = True
 while running: 
 
     screen.fill((255,255,255)) #fills the background with white
+
+    # *--PLAYER GRAVITY--*
+    if player_location[1] > floor_location[1]-player_location[1]:
+        player_y_momentum += 0.2
+    else:
+        player_y_momentum = 0
+
+    player_location[1] += player_y_momentum
 
     # *--PLAYER HITBOX--*
     player_rect.x = player_location[0]
@@ -95,11 +104,13 @@ while running:
 
     # *--PLAYER FLOOR INTERACTION--*  there's probably a better way to do this but this is like what i could think off from the top of my head
     if player_rect.colliderect(floor_rect):         
-        if player_location[1] > floor_location[1]-player_location[1]:
-            player_location[1] -= 4
+        if player_location[1] > floor_location[1]-player_location[1]:    
+            pass
         else:
             pass
 
+
+            
     pygame.draw.rect(screen, (92, 64, 51), floor_rect) #draws the floor w the rect 
 
     screen.blit(player_sprite, player_location) #draws the player onto the screen with its corresponding location
