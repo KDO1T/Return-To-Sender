@@ -96,7 +96,7 @@ while running:
     # *--PLAYER FLOOR INTERACTION--*  there's probably a better way to do this but this is like what i could think off from the top of my head
     if player_rect.colliderect(floor_rect):         
         if player_location[1] > floor_location[1]-player_location[1]:
-            player_location[1] -= 5
+            player_location[1] -= 4
         else:
             pass
 
