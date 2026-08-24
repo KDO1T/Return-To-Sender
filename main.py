@@ -5,7 +5,6 @@ clock = pygame.time.Clock() #assigning the clock function to a variable to use f
 #1. initiliaze pygame, 2. names the window, 3. sets the window size and sets its paramaters
 pygame.init()
 pygame.display.set_caption("Return To Sender") 
-
 window_size = (1000, 500)
 screen = pygame.display.set_mode(window_size) # fixed resolution, might change later due to technical issues
 
@@ -38,6 +37,7 @@ tiles = [pygame.Rect(0, window_size[1]-50, 200,50 ), pygame.Rect(200, window_siz
 running = True
 while running: 
 
+    jump = False
 
        # *--INPUT DETECTION--*
     for event in pygame.event.get(): #just detects if any 'events' occur
@@ -59,6 +59,9 @@ while running:
                 moving_right = True
             if event.key == pygame.K_a: #pressing A (left)
                 moving_left = True
+            if event.key == pygame.K_SPACE:
+                jump = True
+
 
             # *--KEY IS LET GO--*  
         if event.type == pygame.KEYUP:
@@ -78,21 +81,22 @@ while running:
      # *--PLAYER GRAVITY--*
     player_movement[1] = player_y_momentum
 
-
     player_y_momentum += 0.2
-    if player_y_momentum > 6:
-        player_y_momentum = 6
+    if player_y_momentum > 10:
+        player_y_momentum = 10
 
     player_rect.y += player_movement[1]
 
-     # *--PLAYER MOVEMENT--*
-    # if moving_up == True:
-    #     player_movement[1]= -4
-    #     player_rect.y += player_movement[1]
+    # *--JUMPING--*
+    if jump == True:
+        player_y_momentum = -6
+        # @ player_y_momentum -= 5 for diminishing jumps
 
-    # if moving_down == True:
-    #     player_movement[1]= 4
-    #     player_rect.y += player_movement[1]
+        #wanna try add double jump but donno how
+    
+
+
+     # *--PLAYER MOVEMENT--*
 
     if moving_right == True:
         player_movement[0]= 4
@@ -159,6 +163,7 @@ while running:
 
     for tile in tiles:
         pygame.draw.rect(screen, (92, 64, 51), tile)
+
 
 
     screen.blit(player_sprite, player_rect) #draws the player onto the location of its hitbox*
