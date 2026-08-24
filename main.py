@@ -13,22 +13,22 @@ screen = pygame.display.set_mode(window_size) # fixed resolution, might change l
 
 # *--PLAYER STUFF--*
 player_sprite = pygame.image.load('sprites/jimmy.png')
-player_location = [250,250]
 moving_up = False
 moving_down = False
 moving_right = False
 moving_left = False
-player_rect = pygame.Rect(player_location[0], player_location[1], player_sprite.get_width(), player_sprite.get_height()) #player hitbox
+player_rect = pygame.Rect(250, 250, player_sprite.get_width(), player_sprite.get_height()) #player hitbox
 player_y_momentum = 0 # <-- gravity enacted on the player
+
+
 
 object_rect = pygame.Rect(300, 300, 250,250)
 
 # *--TILES OBJECTS--*
-tiles = [pygame.Rect(200,50, 0, window_size[1]-50), pygame.Rect(200,50, 200, window_size[1]-50), 
-         pygame.Rect(200,50, 400, window_size[1]-50), pygame.Rect(200,50, 800, window_size[1]-50),
-          pygame.Rect(200,50, 1000, window_size[1]-50) ]
+tiles = [pygame.Rect(0, window_size[1]-50, 200,50 ), pygame.Rect(200, window_size[1]-50, 200,50), 
+         pygame.Rect(400, window_size[1]-50, 200,50), pygame.Rect(600, window_size[1]-50, 200,50),
+         pygame.Rect(800, window_size[1]-50, 200,50 ),pygame.Rect(1000, window_size[1]-50, 200,50 ) ]
 
-tile_collisions = []
 
 # *-- FLOOR OBJECT--*
 # floor_object = [window_size[0], 50] # width x height
@@ -45,38 +45,10 @@ tile_collisions = []
 running = True
 while running: 
 
-    screen.fill((255,255,255)) #fills the background with white
+    x_movement = 0
+    y_movement = 0
 
-
-    # *--TILE COLLISIONS--*
-    for tile in tiles:
-        if player_rect.colliderect(tile):
-            tile_collisions.append(tile)
-
-    for tile in tile_collisions:
-        if player_location [0]
-
-
-
-    for tile in tiles:
-        pygame.draw.rect(screen, (92, 64, 51), tile)
-
-
-
-    # *--PLAYER GRAVITY--*
-    if player_location[1] > window_size[1]-50:
-        player_y_momentum += 0.2
-    else:
-        player_y_momentum = 0
-
-    player_location[1] += player_y_momentum
-
-    # *--PLAYER HITBOX--*
-    player_rect.x = player_location[0]
-    player_rect.y = player_location[1]
-    
-
-    # *--INPUT DETECTION--*
+       # *--INPUT DETECTION--*
     for event in pygame.event.get(): #just detects if any 'events' occur
 
         # *--QUIT--*
@@ -108,18 +80,72 @@ while running:
             if event.key == pygame.K_a: #let go of A (left)
                 moving_left = False
 
-    # *--PLAYER MOVEMENT--*
+     # *--PLAYER MOVEMENT--*
     if moving_up == True:
-        player_location[1] -= 4 
+        y_movement= -4
+        player_rect.y += y_movement
+
     if moving_down == True:
-        player_location[1] += 4
+        y_movement= 4
+        player_rect.y += y_movement
+
     if moving_right == True:
-        player_location[0] += 4
+        x_movement= 4
+        player_rect.x += x_movement
+
     if moving_left == True:
-        player_location[0] -= 4
+        x_movement= -4
+        player_rect.x += x_movement
+ 
 
 
 
+    
+    
+    # *--TILE COLLISIONS--*
+
+
+    for tile in tiles:
+        if player_rect.colliderect(tile):
+           
+                if x_movement > 0:
+                    player_rect.right = tile.left
+
+                if x_movement < 0:
+                    player_rect.left = tile.right
+
+
+
+    for tile in tiles:
+        if player_rect.colliderect(tile):
+                
+                if y_movement > 0:
+                    player_rect.bottom = tile.top
+
+                if y_movement < 0:
+                    player_rect.top = tile.bottom
+
+
+
+
+
+    
+
+
+    # *--PLAYER GRAVITY--*
+    # if player_location[1] > window_size[1]-50:
+    #     player_y_momentum += 0.2
+    # else:
+    #     player_y_momentum = 0
+
+    # player_location[1] += player_y_momentum
+
+    
+
+    # *--RENDERING--*
+    
+
+    screen.fill((255,255,255)) #fills the background with white
 
     # *--COLLISION TESTING--*
     if player_rect.colliderect(object_rect):
@@ -127,11 +153,11 @@ while running:
     else:
         pygame.draw.rect(screen, (0, 255, 0), object_rect)
 
-    
+    for tile in tiles:
+        pygame.draw.rect(screen, (92, 64, 51), tile)
 
 
-
-    screen.blit(player_sprite, player_location) #draws the player onto the screen with its corresponding location
+    screen.blit(player_sprite, player_rect) #draws the player onto the screen with its corresponding location
 
     pygame.display.update() #updates the screen
     clock.tick(60) #ensures framerate is consistently 60fps
