@@ -23,10 +23,19 @@ player_y_momentum = 0 # <-- gravity enacted on the player
 
 object_rect = pygame.Rect(300, 300, 250,250)
 
-#floor object
-floor_object = [window_size[0], 50] # width x height
-floor_location = [0, window_size[1]-floor_object[1]]
-floor_rect = pygame.Rect(floor_location[0], floor_location[1], floor_object[0], floor_object[1])
+# *--TILES OBJECTS--*
+tiles = [pygame.Rect(200,50, 0, window_size[1]-50), pygame.Rect(200,50, 200, window_size[1]-50), 
+         pygame.Rect(200,50, 400, window_size[1]-50), pygame.Rect(200,50, 800, window_size[1]-50),
+          pygame.Rect(200,50, 1000, window_size[1]-50) ]
+
+tile_collisions = []
+
+# *-- FLOOR OBJECT--*
+# floor_object = [window_size[0], 50] # width x height
+# floor_location = [0, window_size[1]-floor_object[1]]
+# floor_rect = pygame.Rect(floor_location[0], floor_location[1], floor_object[0], floor_object[1])
+
+
 
 
 
@@ -38,8 +47,24 @@ while running:
 
     screen.fill((255,255,255)) #fills the background with white
 
+
+    # *--TILE COLLISIONS--*
+    for tile in tiles:
+        if player_rect.colliderect(tile):
+            tile_collisions.append(tile)
+
+    for tile in tile_collisions:
+        if player_location [0]
+
+
+
+    for tile in tiles:
+        pygame.draw.rect(screen, (92, 64, 51), tile)
+
+
+
     # *--PLAYER GRAVITY--*
-    if player_location[1] > floor_location[1]-player_location[1]:
+    if player_location[1] > window_size[1]-50:
         player_y_momentum += 0.2
     else:
         player_y_momentum = 0
@@ -102,16 +127,9 @@ while running:
     else:
         pygame.draw.rect(screen, (0, 255, 0), object_rect)
 
-    # *--PLAYER FLOOR INTERACTION--*  there's probably a better way to do this but this is like what i could think off from the top of my head
-    if player_rect.colliderect(floor_rect):         
-        if player_location[1] > floor_location[1]-player_location[1]:    
-            pass
-        else:
-            pass
+    
 
 
-            
-    pygame.draw.rect(screen, (92, 64, 51), floor_rect) #draws the floor w the rect 
 
     screen.blit(player_sprite, player_location) #draws the player onto the screen with its corresponding location
 
