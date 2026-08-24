@@ -14,8 +14,7 @@ screen = pygame.display.set_mode((display_w,display_h))
 sprites = Spritesheet('spritesheet.png')
 
 
-map = TileMap('test_level.csv', sprites)
-start_x, start_y = map.start_x, map.start_y
+map = TileMap('test_level.csv', sprites) #passes the csv file and the png file into the map variable
 
 while True:
 
@@ -24,8 +23,8 @@ while True:
             pygame.quit()
             sys.exit()
 
-    canvas.fill((159, 215, 255))
-    map.draw_map(canvas)
-    screen.blit(canvas,(0,0))
+    canvas.fill((159, 215, 255))    #nice sky background
+    map.draw_map(canvas)    #uses the draw_map function to blit the surface of the tilemap onto the screen
+    screen.blit(canvas,(0,0))   #creates a window to be displayed
     pygame.display.update()
     clock.tick(60)
