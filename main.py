@@ -93,6 +93,7 @@ while running:
         # @ player_y_momentum -= 5 for diminishing jumps
 
         #wanna try add double jump but donno how
+        #if and for statement make each jump increment by 1 until 2 then cannot jump until touch floor
     
 
 
