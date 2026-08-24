@@ -30,13 +30,6 @@ tiles = [pygame.Rect(0, window_size[1]-50, 200,50 ), pygame.Rect(200, window_siz
          pygame.Rect(800, window_size[1]-50, 200,50 ),pygame.Rect(1000, window_size[1]-50, 200,50 ) ]
 
 
-# *-- FLOOR OBJECT--*
-# floor_object = [window_size[0], 50] # width x height
-# floor_location = [0, window_size[1]-floor_object[1]]
-# floor_rect = pygame.Rect(floor_location[0], floor_location[1], floor_object[0], floor_object[1])
-
-
-
 
 
 
@@ -45,8 +38,6 @@ tiles = [pygame.Rect(0, window_size[1]-50, 200,50 ), pygame.Rect(200, window_siz
 running = True
 while running: 
 
-    x_movement = 0
-    y_movement = 0
 
        # *--INPUT DETECTION--*
     for event in pygame.event.get(): #just detects if any 'events' occur
@@ -80,23 +71,43 @@ while running:
             if event.key == pygame.K_a: #let go of A (left)
                 moving_left = False
 
-     # *--PLAYER MOVEMENT--*
-    if moving_up == True:
-        y_movement= -4
-        player_rect.y += y_movement
 
-    if moving_down == True:
-        y_movement= 4
-        player_rect.y += y_movement
+    player_movement = [0,0]  
+
+
+     # *--PLAYER GRAVITY--*
+    player_movement[1] = player_y_momentum
+
+
+    player_y_momentum += 0.2
+    if player_y_momentum > 6:
+        player_y_momentum = 6
+
+    player_rect.y += player_movement[1]
+
+     # *--PLAYER MOVEMENT--*
+    # if moving_up == True:
+    #     player_movement[1]= -4
+    #     player_rect.y += player_movement[1]
+
+    # if moving_down == True:
+    #     player_movement[1]= 4
+    #     player_rect.y += player_movement[1]
 
     if moving_right == True:
-        x_movement= 4
-        player_rect.x += x_movement
+        player_movement[0]= 4
+        player_rect.x += player_movement[0]
 
     if moving_left == True:
-        x_movement= -4
-        player_rect.x += x_movement
+        player_movement[0]= -4
+        player_rect.x += player_movement[0]
  
+
+
+
+
+
+
 
 
 
@@ -105,40 +116,33 @@ while running:
     # *--TILE COLLISIONS--*
 
 
-    for tile in tiles:
-        if player_rect.colliderect(tile):
+        # *-- HORIZONTAL COLLISIONS --*
+    # for tile in tiles:
+    #     if player_rect.colliderect(tile):
            
-                if x_movement > 0:
-                    player_rect.right = tile.left
+    #         if player_movement[0] > 0:
+    #             player_rect.right = tile.left
 
-                if x_movement < 0:
-                    player_rect.left = tile.right
+    #         if player_movement[0] < 0:
+    #             player_rect.left = tile.right
+    
 
+    #  ^^if i turn this on it bugs the whole game out
 
-
+        # *-- VERTICAL COLLISIONS --*
     for tile in tiles:
         if player_rect.colliderect(tile):
                 
-                if y_movement > 0:
-                    player_rect.bottom = tile.top
-
-                if y_movement < 0:
-                    player_rect.top = tile.bottom
-
-
-
-
+            if player_movement[1] > 0:
+                player_rect.bottom = tile.top
+                player_y_momentum = 0 # <-- basically tells the game that i can stop falling now
+                
+            if player_movement[1] < 0:
+                player_rect.top = tile.bottom
+                player_y_momentum = 0 # <-- same with this
 
     
 
-
-    # *--PLAYER GRAVITY--*
-    # if player_location[1] > window_size[1]-50:
-    #     player_y_momentum += 0.2
-    # else:
-    #     player_y_momentum = 0
-
-    # player_location[1] += player_y_momentum
 
     
 
@@ -157,7 +161,7 @@ while running:
         pygame.draw.rect(screen, (92, 64, 51), tile)
 
 
-    screen.blit(player_sprite, player_rect) #draws the player onto the screen with its corresponding location
+    screen.blit(player_sprite, player_rect) #draws the player onto the location of its hitbox*
 
     pygame.display.update() #updates the screen
     clock.tick(60) #ensures framerate is consistently 60fps
