@@ -18,8 +18,9 @@ moving_right = False
 moving_left = False
 player_rect = pygame.Rect(250, 250, player_sprite.get_width(), player_sprite.get_height()) #player hitbox
 player_y_momentum = 0 # <-- gravity enacted on the player
+max_air_jumps = 1
 air_jumps = 0
-can_jump = True
+on_ground = None
 
 object_rect = pygame.Rect(300, 300, 250,250)
 
@@ -42,9 +43,7 @@ platform_tiles = [
 running = True
 while running: 
 
-    # max_air_jumps = 1
     jump = False
-
        # *--INPUT DETECTION--*
     for event in pygame.event.get(): #just detects if any 'events' occur
 
@@ -67,24 +66,17 @@ while running:
                 moving_left = True
             if event.key == pygame.K_SPACE:
 
-                # for tile in floor_tiles and tile in platform_tiles:
-                #     if player_rect.colliderect(tile):
-                        
-                        #positive y momentum is downward | negative y momentum is upward
-                        if  player_y_momentum >= 0 and player_y_momentum <= 1:#player touching ground
-                            can_jump = True
-                        else:
-                            can_jump = False
-
-                        print(player_y_momentum)
-                        print(can_jump)
-
-                        if can_jump == True:  
-                            #player is jumping from a stable surface i.e. not in the air
-                            jump = True
-                        else:  
-                            jump = False
-                        
+                #positive y momentum is downward | negative y momentum is upward
+                if on_ground is True: #player touching ground
+                    jump = True
+                    air_jumps = max_air_jumps
+                else: #player is in the air
+                    if air_jumps > 0: #if player has an extra jump, then jump then deduct from remaining jumps
+                        jump = True
+                        air_jumps -= 1
+                    else:
+                        pass
+            
 
 
             # *--KEY IS LET GO--*  
@@ -99,7 +91,6 @@ while running:
                 moving_left = False
 
 
-    player_movement = [0,0]  
 
 
 
@@ -109,6 +100,8 @@ while running:
 
 
     # *--HORIZONTAL MOVEMENT + COLLISIONS--*
+
+    player_movement = [0,0]  
 
     #left and right movement
     if moving_right == True:
@@ -140,6 +133,11 @@ while running:
     if player_y_momentum > 10:
         player_y_momentum = 10
 
+    if player_y_momentum >= 0 and player_y_momentum <= 1: #checks if player is in the air
+        pass
+    else:
+        on_ground = False
+
     player_rect.y += player_movement[1]
 
     #jump
@@ -152,8 +150,8 @@ while running:
             if player_movement[1] > 0:
                 player_rect.bottom = tile.top
                 player_y_momentum = 0 # <-- basically tells the game that i can stop falling now
-                print("you can jump")
-                
+                on_ground = True
+        
             if player_movement[1] < 0:
                 player_rect.top = tile.bottom
                 player_y_momentum = 0 # <-- same with this
@@ -165,7 +163,7 @@ while running:
             if player_movement[1] > 0:
                 player_rect.bottom = tile.top
                 player_y_momentum = 0 # <-- basically tells the game that i can stop falling now
-                print("you can jump")
+                on_ground = True
                 
             if player_movement[1] < 0:
                 player_rect.top = tile.bottom
