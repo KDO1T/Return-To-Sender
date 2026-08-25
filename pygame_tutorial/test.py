@@ -19,8 +19,8 @@ main_menu = ["Play", "Options", "Quit"]
 
 
 # fonts
-font_title = pygame.font.Font("fonts/Press_Start_2P/PressStart2P.ttf", 30)
-font_menu = pygame.font.Font("fonts/VT323/VT323.ttf", 45)
+font_title = pygame.font.Font("pygame_tutorial/Press_Start_2P/PressStart2P.ttf", 30)
+font_menu = pygame.font.Font("pygame_tutorial/VT323/VT323.ttf", 45)
 
 option_text = font_menu.render("Play", False, (240, 240, 240))
 text = font_title.render("Return To Sender", False, (240, 240, 240))
