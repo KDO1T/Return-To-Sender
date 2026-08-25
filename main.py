@@ -67,21 +67,24 @@ while running:
                 moving_left = True
             if event.key == pygame.K_SPACE:
 
-                #positive y momentum is downward | negative y momentum is upward
-                if  player_y_momentum >= 0 and player_y_momentum <= 1:#player touching ground
-                    can_jump = True
-                else:
-                    can_jump = False
+                # for tile in floor_tiles and tile in platform_tiles:
+                #     if player_rect.colliderect(tile):
+                        
+                        #positive y momentum is downward | negative y momentum is upward
+                        if  player_y_momentum >= 0 and player_y_momentum <= 1:#player touching ground
+                            can_jump = True
+                        else:
+                            can_jump = False
 
-                print(player_y_momentum)
-                print(can_jump)
+                        print(player_y_momentum)
+                        print(can_jump)
 
-                if can_jump == True:  
-                    #player is jumping from a stable surface i.e. not in the air
-                    jump = True
-                else:  
-                    jump = False
-                    
+                        if can_jump == True:  
+                            #player is jumping from a stable surface i.e. not in the air
+                            jump = True
+                        else:  
+                            jump = False
+                        
 
 
             # *--KEY IS LET GO--*  
