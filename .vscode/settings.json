@@ -1,5 +1,10 @@
 {
     "cSpell.words": [
-        "blit"
+        "blit",
+        "centerx",
+        "collidepoint",
+        "Fixedsys",
+        "MOUSEBUTTONDOWN",
+        "MOUSEMOTION"
     ]
 }
