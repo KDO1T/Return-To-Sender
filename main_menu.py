@@ -54,6 +54,15 @@ while True:
         if event.type == pygame.QUIT:
             pygame.quit()
             exit()
+
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_DOWN:
+                selected = (selected + 1) % len(main_menu)
+
+        elif event.type == pygame.KEYUP:
+            if event.key == pygame.K_UP:
+                selected = (selected - 1) % len(main_menu)
+
     screen.blit(text, rect_text)
     pygame.display.update()
     clock.tick(60)
