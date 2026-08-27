@@ -76,7 +76,7 @@ while running:
                         air_jumps -= 1
                     else:
                         pass
-            
+             
 
 
             # *--KEY IS LET GO--*  
