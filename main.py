@@ -29,13 +29,14 @@ screen = pygame.display.set_mode((screen_state_w, screen_state_h), status)
 
 #map
 sprites = Spritesheet('spritesheet.png')
-map_files = ['screen1.csv', 'screen2.csv','screen3.csv'] #passes the csv file and the png file into the map variable
+map_grid = [['screenR1C1.csv', 'screenR1C2.csv','screenR1C3.csv'],
+            ['screenR2C1.csv','screenR2C2.csv','screenR2C3.csv']] #passes the csv file and the png file into the map variable
 
-maps = [TileMap(file,sprites) for file in map_files]
+maps = [[TileMap(file,sprites) for file in row] for row in map_grid]            #puts all row files in map_grid into a list, and putting all maps from the list into maps
 
-#combine both map
-total_map_w = sum(m.map_w  for m in maps)   #loops through maps list
-total_map_h = max(m.map_h for m in maps)
+#combine both map (top and bottom)
+total_map_w = sum(tile_maps.map_w  for tile_maps in maps[0])   #loops through maps list
+total_map_h = sum(row[0].map_h for row in maps)
 
 while True:
 
@@ -60,11 +61,16 @@ while True:
                 screen_state_w, screen_state_h = display_w, display_h
                 screen = pygame.display.set_mode((display_w,display_h), status)
 
+    #map movement ,+x,-x, +y,-y
     key_input = pygame.key.get_pressed()
     if key_input[K_a]:
         camera_x -=camera_speed
     if key_input[K_d]:
         camera_x +=camera_speed
+    if key_input[K_w]:
+        camera_y -= camera_speed
+    if key_input[K_s]:
+        camera_y += camera_speed
 
     #map clamping      
     max_cam_x = total_map_w - base_res_x
@@ -74,10 +80,18 @@ while True:
     camera_y = max(0, min(camera_y, max_cam_y))
 
     canvas.fill((159, 215, 255))    #nice sky background
-    current_offset_x = 0
-    for tile_map in maps:
-        tile_map.draw_map(canvas, camera_x, camera_y, offset_x = current_offset_x)
-        current_offset_x += tile_map.map_w
+    current_y= 0
+    #filtering through the top and bottom layer in maps
+    for row in maps:            
+        current_x = 0
+        #filtering through each screen in each layer
+        for tile_map in row:
+            #drawing the map with respect to each offset
+            tile_map.draw_map(canvas, camera_x, camera_y, offset_x = current_x, offset_y = current_y)
+            #updating x offset
+            current_x += tile_map.map_w
+        #updating y offset
+        current_y += row[0].map_h
 
     #scale the screen
     scaled_resolution = pygame.transform.scale(canvas, (screen_state_w, screen_state_h))
