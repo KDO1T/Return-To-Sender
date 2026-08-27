@@ -62,11 +62,14 @@ save_slots = [
 ]
 
 selected_save = None
+renaming_save = None
+rename_text = ""
 
 
 selected = 0
 current_state = "MAIN"
 
+# event loop
 while True:
     screen.fill((15, 15, 20))
 
@@ -111,8 +114,15 @@ while True:
                     screen, (60, 60, 70), card_rect, 3
                 )
 
+            if renaming_save and selected_save == index:
+                name = rename_text
+                name_color = (235, 65, 40)
+            else:
+                name = save["name"]
+                name_color = (240, 240, 240)
+
             name_text = font_menu.render(
-                save["name"], False, (240, 240, 240)
+                name, False, name_color
             )
 
             name_rect = name_text.get_rect()
@@ -155,13 +165,14 @@ while True:
 
         screen.blit(back_text, back_rect)
 
-    # input
+    
+        # input
     for event in pygame.event.get():
 
         if event.type == pygame.QUIT:
             pygame.quit()
             exit()
-
+        #mouse input
         elif event.type == pygame.MOUSEBUTTONDOWN:
 
             if event.button == 1:
@@ -199,14 +210,39 @@ while True:
                             save_card_width,
                             save_card_height
                         )
-
+                        # renaming save slots
                         if card_rect.collidepoint(event.pos):
 
-                            if selected_save == index:
+                            name_text = font_menu.render(
+                                save_slots[index]["name"],
+                                False,
+                                (240, 240, 240)
+                            )
+
+                            name_rect = name_text.get_rect()
+                            name_rect.center = (
+                                card_rect.centerx,
+                                card_rect.y + 35
+                            )
+
+                        
+                            if name_rect.collidepoint(event.pos):
+
+                                # when you select save 1 you can't rename save 2, and vice versa
+                                if selected_save == index:
+                                    renaming_save = True
+                                    rename_text = save_slots[index]["name"]
+
+                                else:
+                                    selected_save = index
+                                    renaming_save = False
+
+                            elif selected_save == index:
                                 print(
                                     "OPEN SAVE:",
                                     save_slots[index]["name"]
                                 )
+
                             else:
                                 selected_save = index
 
@@ -217,6 +253,25 @@ while True:
                     if back_rect.collidepoint(event.pos):
                         current_state = "MAIN"
                         selected_save = None
+                        renaming_save = None
+        #keyboard
+        elif event.type == pygame.KEYDOWN:
+
+            if renaming_save:
+
+                if event.key == pygame.K_RETURN:
+                    save_slots[selected_save]["name"] = rename_text
+                    renaming_save = False
+
+                elif event.key == pygame.K_BACKSPACE:
+                    rename_text = rename_text[:-1]
+
+                # to add a new letter/character if there is anything "else"
+                else:
+                    if event.unicode.isprintable():
+                        rename_text += event.unicode
+
 
     pygame.display.update()
     clock.tick(60)
+    
