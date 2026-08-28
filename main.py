@@ -171,19 +171,19 @@ while running:
 
     # *-- VERTICAL MOVEMENT + VERTICAL COLLISIONS --*
     
-    #gravity
-    player_movement[1] = player_y_momentum
+    # #gravity
+    # player_movement[1] = player_y_momentum
     
-    player_y_momentum += 0.2
-    if player_y_momentum > 10:
-        player_y_momentum = 10
+    # player_y_momentum += 0.2
+    # if player_y_momentum > 10:
+    #     player_y_momentum = 10
 
-    if player_y_momentum >= 0 and player_y_momentum <= 1: #checks if player is in the air
-        pass
-    else:
-        on_ground = False
+    # if player_y_momentum >= 0 and player_y_momentum <= 1: #checks if player is in the air
+    #     pass
+    # else:
+    #     on_ground = False
 
-    player_rect.y += player_movement[1]
+    # player_rect.y += player_movement[1]
 
     #jump
     if jump == True:
@@ -222,8 +222,8 @@ while running:
 
 
 
-    camera_x = player_rect.centerx - base_res_x // 2
-    camera_y = player_rect.centery - base_res_y // 2
+    camera_x = player_rect.centerx - (base_res_x // 2)
+    camera_y = player_rect.centery - (base_res_y // 2)
 
      #map clamping      
     max_cam_x = total_map_w - base_res_x
@@ -251,12 +251,17 @@ while running:
         #updating y offset
         current_y += row[0].map_h
 
+    player_render_pos = (player_rect.x - camera_x, player_rect.y - camera_y)
+    canvas.blit(player_sprite, player_render_pos) #draws the player onto the location of its hitbox*
+
+
+
     #scale the screen
     scaled_resolution = pygame.transform.scale(canvas, (screen_state_w, screen_state_h))
 
+
     screen.blit(scaled_resolution,(0,0))   #creates a window to be displayed
 
-    screen.blit(player_sprite, player_rect) #draws the player onto the location of its hitbox*
 
     pygame.display.update() #updates the screen
     clock.tick(60) #ensures framerate is consistently 60fps
