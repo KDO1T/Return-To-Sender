@@ -202,6 +202,7 @@ while True:
                 elif current_state == "PLAY":
 
                     for index, position in enumerate(save_card_positions):
+
                         x, y = position
 
                         card_rect = pygame.Rect(
@@ -210,6 +211,73 @@ while True:
                             save_card_width,
                             save_card_height
                         )
+
+                        if card_rect.collidepoint(event.pos):
+
+                            name_text = font_menu.render(
+                                save_slots[index]["name"],
+                                False,
+                                (240, 240, 240)
+                            )
+
+                            name_rect = name_text.get_rect()
+                            name_rect.center = (
+                                card_rect.centerx,
+                                card_rect.y + 35
+                            )
+
+                            # clicked the name
+                            if name_rect.collidepoint(event.pos):
+
+                                if selected_save == index:
+
+                                    if not renaming_save:
+                                        renaming_save = True
+                                        rename_text = save_slots[index]["name"]
+
+                                else:
+
+                                    # finish the previous rename
+                                    if renaming_save:
+                                        save_slots[selected_save]["name"] = rename_text
+
+                                    selected_save = index
+                                    renaming_save = False
+
+                            # clicked somewhere else on the selected card
+                            elif selected_save == index:
+
+                                if renaming_save:
+                                    save_slots[selected_save]["name"] = rename_text
+                                    renaming_save = False
+
+                                else:
+                                    print(
+                                        "OPEN SAVE:",
+                                        save_slots[index]["name"]
+                                    )
+
+                            # clicked another card
+                            else:
+
+                                if renaming_save:
+                                    save_slots[selected_save]["name"] = rename_text
+                                    renaming_save = False
+
+                                selected_save = index
+
+                    back_rect = pygame.Rect(
+                        0, 290, width, 40
+                    )
+
+                    if back_rect.collidepoint(event.pos):
+
+                        if renaming_save:
+                            save_slots[selected_save]["name"] = rename_text
+                            renaming_save = False
+
+                        current_state = "MAIN"
+                        selected_save = None
                         # renaming save slots
                         if card_rect.collidepoint(event.pos):
 
