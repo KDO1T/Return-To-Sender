@@ -89,22 +89,22 @@ while running:
 
         # *--KEY DETECTION--*
 
-            # *--WINDOW CONTROLS--*
-            if event.type == VIDEORESIZE and status == RESIZABLE:
-                                window_w, window_h = event.w , event.h
-                                screen_state_w, screen_state_h = window_w, window_h
-                                screen = pygame.display.set_mode((screen_state_w, screen_state_h),status)
-    
-            if event.type == KEYDOWN:
-                if event.key == K_F1:
-                    status = RESIZABLE
-                    screen_state_w, screen_state_h = window_w, window_h
-                    screen = pygame.display.set_mode((screen_state_w, screen_state_h), status)
-    
-                elif event.key == K_F11:
-                    status = FULLSCREEN
-                    screen_state_w, screen_state_h = display_w, display_h
-                    screen = pygame.display.set_mode((display_w,display_h), status)
+        # *--WINDOW CONTROLS--*
+        if event.type == VIDEORESIZE and status == RESIZABLE:
+                            window_w, window_h = event.w , event.h
+                            screen_state_w, screen_state_h = window_w, window_h
+                            screen = pygame.display.set_mode((screen_state_w, screen_state_h),status)
+
+        if event.type == KEYDOWN:
+            if event.key == K_F1:
+                status = RESIZABLE
+                screen_state_w, screen_state_h = window_w, window_h
+                screen = pygame.display.set_mode((screen_state_w, screen_state_h), status)
+
+            elif event.key == K_F11:
+                status = FULLSCREEN
+                screen_state_w, screen_state_h = display_w, display_h
+                screen = pygame.display.set_mode((display_w,display_h), status)
 
 
             # *--KEY PRESSED--*
