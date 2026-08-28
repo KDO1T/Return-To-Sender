@@ -62,12 +62,30 @@ save_slots = [
 ]
 
 selected_save = None
-renaming_save = None
+renaming_save = False
 rename_text = ""
+old_name = ""
 
 
 selected = 0
 current_state = "MAIN"
+
+def save_rename():
+
+    new_name = rename_text.strip()
+
+    if new_name == "":      #makes sure every rename isn't empty
+        save_slots[selected_save]["name"] = old_name
+        return False
+
+    for index, save in enumerate(save_slots):
+
+        if index != selected_save and save["name"].lower() == new_name.lower():
+            save_slots[selected_save]["name"] = old_name
+            return False
+
+    save_slots[selected_save]["name"] = new_name
+    return True
 
 # event loop
 while True:
@@ -234,6 +252,7 @@ while True:
                                     if not renaming_save:
                                         renaming_save = True
                                         rename_text = save_slots[index]["name"]
+                                        old_name = save_slots[index]["name"]
 
                                 else:
 
@@ -248,7 +267,7 @@ while True:
                             elif selected_save == index:
 
                                 if renaming_save:
-                                    save_slots[selected_save]["name"] = rename_text
+                                    save_rename()
                                     renaming_save = False
 
                                 else:
@@ -259,9 +278,9 @@ while True:
 
                             # clicked another card
                             else:
-
+                                # opening another save will still be implemented but we have to check whether it's empty or the name is duplicated
                                 if renaming_save:
-                                    save_slots[selected_save]["name"] = rename_text
+                                    save_rename()
                                     renaming_save = False
 
                                 selected_save = index
@@ -273,11 +292,12 @@ while True:
                     if back_rect.collidepoint(event.pos):
 
                         if renaming_save:
-                            save_slots[selected_save]["name"] = rename_text
+                            # save_slots()
                             renaming_save = False
 
                         current_state = "MAIN"
                         selected_save = None
+
                         # renaming save slots
                         if card_rect.collidepoint(event.pos):
 
@@ -326,10 +346,11 @@ while True:
         elif event.type == pygame.KEYDOWN:
 
             if renaming_save:
-
+                # makes sure that if they press enter the renaming isn't implemeted, but they are still editing
                 if event.key == pygame.K_RETURN:
-                    save_slots[selected_save]["name"] = rename_text
-                    renaming_save = False
+                    if save_rename():
+                        renaming_save = False
+
 
                 elif event.key == pygame.K_BACKSPACE:
                     rename_text = rename_text[:-1]
