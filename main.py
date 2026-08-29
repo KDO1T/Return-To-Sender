@@ -78,8 +78,6 @@ while running:
        # *--INPUT DETECTION--*
     for event in pygame.event.get(): #just detects if any 'events' occur
 
-        
-    
 
 
         # *--QUIT--*

@@ -24,7 +24,7 @@ class TileMap():
         self.map_h = len(self.map_data)*self.tile_size  #same but with rows
         self.map_surface = pygame.Surface((self.map_w, self.map_h)) #creates a surface that is mimics the size of each column and row but sized to the correct tile size
         self.map_surface.set_colorkey((0,0,0))
-        self.tiles = self.load_tiles(mapname)
+        self.tiles, self.rects_list = self.load_tiles(mapname)
         self.load_map() #loads the map
 
     def draw_map(self, surface, camera_x= 0, camera_y=0, offset_x=0, offset_y=0):
@@ -48,6 +48,7 @@ class TileMap():
     #LOAD TILES INTO THE CSV INDEX
     def load_tiles(self, mapname):
         tiles = []
+        rects_list = []
         map = self.read_csv(mapname)
         y= 0
         for row in map:
@@ -59,6 +60,10 @@ class TileMap():
                     map_x = x*self.tile_size
                     map_y = y*self.tile_size
 
+                    tile_rect = pygame.Rect(map_x, map_y, self.tile_size, self.tile_size)
+                    rects_list.append(tile_rect)
+
+
                     tile_num = int(tile_id)+1
                     sprite_name = f"tile{tile_num:02d}"
 
@@ -66,4 +71,4 @@ class TileMap():
                 x+=1
             y+=1
 
-        return tiles
+        return tiles, rects_list
