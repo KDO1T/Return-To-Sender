@@ -42,7 +42,7 @@ total_map_h = sum(row[0].map_h for row in maps)
 
 
 # *--PLAYER STUFF--*
-player_sprite = pygame.image.load('sprites/jimmy_2.png')
+player_sprite = pygame.image.load('sprites/ajimmus.png')
 moving_up = False
 moving_down = False
 moving_right = False
@@ -156,7 +156,16 @@ while running:
     if moving_left == True:
         player_movement[0]= -4
         player_rect.x += player_movement[0]
- 
+
+    #REMOVE LATER
+    if moving_down == True:
+        player_movement[1]= 4
+        player_rect.y += player_movement[1]
+
+    if moving_up == True:
+        player_movement[1]= -4
+        player_rect.y += player_movement[1]
+
     #collisions
     # for tile in platform_tiles:    
     #     if player_rect.colliderect(tile):
@@ -221,8 +230,8 @@ while running:
     # *--CAMERA MOVEMENT--*
 
 
-
-    camera_x = player_rect.centerx - (base_res_x // 2)
+    #these 2 centers the player within the base canvas
+    camera_x = player_rect.centerx - (base_res_x // 2) 
     camera_y = player_rect.centery - (base_res_y // 2)
 
      #map clamping      
@@ -251,7 +260,7 @@ while running:
         #updating y offset
         current_y += row[0].map_h
 
-    player_render_pos = (player_rect.x - camera_x, player_rect.y - camera_y)
+    player_render_pos = (player_rect.x - camera_x, player_rect.y - camera_y) #centers player on screen
     canvas.blit(player_sprite, player_render_pos) #draws the player onto the location of its hitbox*
 
 
