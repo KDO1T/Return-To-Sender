@@ -71,8 +71,7 @@ for row in maps:
 
 #note for rendering: whatever is first rendered in the loop will be behind while whatever is last rendered in the loop will be in the very front
 # *--GAME LOOP--*
-running = True
-while running: 
+while True: 
 
     jump = False
        # *--INPUT DETECTION--*
@@ -208,11 +207,12 @@ while running:
                 player_rect.top = tile.bottom
                 player_y_momentum = 0 # <-- same with this
 
-    # *--RENDERING--*
- 
+                                         # *--RENDERING--*
+ #------------------------------------
+
+
+
     # *--CAMERA MOVEMENT--*
-
-
     #these 2 centers the player within the base canvas
     camera_x = player_rect.centerx - (base_res_x // 2) 
     camera_y = player_rect.centery - (base_res_y // 2)
