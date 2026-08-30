@@ -65,6 +65,8 @@ selected_save = None
 renaming_save = False
 rename_text = ""
 old_name = ""
+max_name_length = 8
+message = ""
 
 
 selected = 0
@@ -72,19 +74,22 @@ current_state = "MAIN"
 
 def save_rename():
 
+    global message
+
     new_name = rename_text.strip()
 
-    if new_name == "":      #makes sure every rename isn't empty
-        save_slots[selected_save]["name"] = old_name
+    if new_name == "":
+        message = "Name cannot be empty."
         return False
 
     for index, save in enumerate(save_slots):
 
         if index != selected_save and save["name"].lower() == new_name.lower():
-            save_slots[selected_save]["name"] = old_name
+            message = "That name is already being used."
             return False
 
     save_slots[selected_save]["name"] = new_name
+    message = ""
     return True
 
 # event loop
@@ -138,6 +143,9 @@ while True:
             else:
                 name = save["name"]
                 name_color = (240, 240, 240)
+
+            if not renaming_save and len(name) > 7:
+                name = name[:7] + "..."
 
             name_text = font_menu.render(
                 name, False, name_color
@@ -357,7 +365,7 @@ while True:
 
                 # to add a new letter/character if there is anything "else"
                 else:
-                    if event.unicode.isprintable():
+                    if event.unicode.isprintable() and len(rename_text) < max_name_length:
                         rename_text += event.unicode
 
 
