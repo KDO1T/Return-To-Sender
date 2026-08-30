@@ -72,3 +72,12 @@ class TileMap():
             y+=1
 
         return tiles, rects_list
+
+    def get_rects(self,offset_x=0,offset_y=0):
+        world_rect_list = []
+        for rect in self.rects_list:
+            world_rect = rect.copy()
+            world_rect.x += offset_x
+            world_rect.y += offset_y
+            world_rect_list.append(world_rect)
+        return world_rect_list
