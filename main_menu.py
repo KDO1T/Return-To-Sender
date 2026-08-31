@@ -17,6 +17,7 @@ clock = pygame.time.Clock()
 # fonts
 font_title = pygame.font.Font("fonts/Press_Start_2P/PressStart2P.ttf", 30)
 font_menu = pygame.font.Font("fonts/VT323/VT323.ttf", 45)
+font_save_name = pygame.font.Font("fonts/VT323/VT323.ttf", 32)
 
 
 text = font_title.render("Return To Sender", False, (240, 240, 240))
@@ -65,7 +66,7 @@ selected_save = None
 renaming_save = False
 rename_text = ""
 old_name = ""
-max_name_length = 8
+max_name_length = 10
 message = ""
 
 
@@ -82,10 +83,14 @@ def save_rename():
         message = "Name cannot be empty."
         return False
 
+    if len(new_name) > max_name_length:
+        message = "Max 10 Characters."
+        return False
+
     for index, save in enumerate(save_slots):
 
         if index != selected_save and save["name"].lower() == new_name.lower():
-            message = "That name is already being used."
+            message = "Name Already In Use."
             return False
 
     save_slots[selected_save]["name"] = new_name
@@ -118,6 +123,7 @@ while True:
             screen.blit(option_text, option_rect)
 
     elif current_state == "PLAY":
+
         for index, save in enumerate(save_slots):
             x, y = save_card_positions[index]
 
@@ -137,19 +143,29 @@ while True:
                     screen, (60, 60, 70), card_rect, 3
                 )
 
+            # save name
             if renaming_save and selected_save == index:
+
                 name = rename_text
-                name_color = (235, 65, 40)
+
+                name_text = font_save_name.render(
+                    name,
+                    False,
+                    (235, 65, 40)
+                )
+
             else:
+
                 name = save["name"]
-                name_color = (240, 240, 240)
 
-            if not renaming_save and len(name) > 7:
-                name = name[:7] + "..."
+                if len(name) > 10:
+                    name = name[:7] + "..."
 
-            name_text = font_menu.render(
-                name, False, name_color
-            )
+                name_text = font_save_name.render(
+                    name,
+                    False,
+                    (240, 240, 240)
+                )
 
             name_rect = name_text.get_rect()
             name_rect.center = (
@@ -157,8 +173,14 @@ while True:
                 card_rect.y + 35
             )
 
+            # keep the name inside the card
+            name_rect.left = max(name_rect.left, card_rect.left + 8)
+
+            name_rect.right = min(name_rect.right, card_rect.right - 8)
+
             screen.blit(name_text, name_rect)
 
+            # save status
             if save["exists"]:
                 info_text = font_menu.render(
                     "SAVED", False, (240, 240, 240)
@@ -176,6 +198,17 @@ while True:
 
             screen.blit(info_text, info_rect)
 
+        # message
+        if message != "":
+            message_text = font_menu.render(
+                message, False, (235, 65, 40)
+            )
+
+            message_rect = message_text.get_rect()
+            message_rect.center = (width / 2, 30)
+
+            screen.blit(message_text, message_rect)
+
         # back button
         back_text = font_menu.render(
             "Back", False, (240, 240, 240)
@@ -191,14 +224,14 @@ while True:
 
         screen.blit(back_text, back_rect)
 
-    
-        # input
+    # input
     for event in pygame.event.get():
 
         if event.type == pygame.QUIT:
             pygame.quit()
             exit()
-        #mouse input
+
+        # mouse
         elif event.type == pygame.MOUSEBUTTONDOWN:
 
             if event.button == 1:
@@ -209,7 +242,10 @@ while True:
                         y = start_y + (index * spacing)
 
                         option_rect = pygame.Rect(
-                            0, y - 20, width, 40
+                            0,
+                            y - 20,
+                            width,
+                            40
                         )
 
                         if option_rect.collidepoint(event.pos):
@@ -217,6 +253,7 @@ while True:
                             if option == "Play":
                                 current_state = "PLAY"
                                 selected_save = None
+                                message = ""
 
                             elif option == "Options":
                                 print("Options")
@@ -226,6 +263,8 @@ while True:
                                 exit()
 
                 elif current_state == "PLAY":
+
+                    clicked_save = False
 
                     for index, position in enumerate(save_card_positions):
 
@@ -240,7 +279,10 @@ while True:
 
                         if card_rect.collidepoint(event.pos):
 
-                            name_text = font_menu.render(
+                            clicked_save = True
+
+                            # make the name hitbox match the name
+                            name_text = font_save_name.render(
                                 save_slots[index]["name"],
                                 False,
                                 (240, 240, 240)
@@ -252,122 +294,91 @@ while True:
                                 card_rect.y + 35
                             )
 
-                            # clicked the name
+                            # clicked the save name
                             if name_rect.collidepoint(event.pos):
 
                                 if selected_save == index:
 
                                     if not renaming_save:
                                         renaming_save = True
-                                        rename_text = save_slots[index]["name"]
                                         old_name = save_slots[index]["name"]
+                                        rename_text = ""
+                                        message = ""
 
                                 else:
 
-                                    # finish the previous rename
                                     if renaming_save:
-                                        save_slots[selected_save]["name"] = rename_text
+                                        renaming_save = False
+                                        rename_text = ""
+                                        message = ""
 
                                     selected_save = index
-                                    renaming_save = False
 
-                            # clicked somewhere else on the selected card
+                            # clicked the selected save
                             elif selected_save == index:
 
                                 if renaming_save:
-                                    save_rename()
-                                    renaming_save = False
-
+                                    if save_rename():
+                                        renaming_save = False
+                                        rename_text = ""
                                 else:
                                     print(
                                         "OPEN SAVE:",
                                         save_slots[index]["name"]
                                     )
 
-                            # clicked another card
+                            # clicked another save
                             else:
-                                # opening another save will still be implemented but we have to check whether it's empty or the name is duplicated
+
                                 if renaming_save:
-                                    save_rename()
                                     renaming_save = False
+                                    rename_text = ""
+                                    message = ""
 
                                 selected_save = index
 
+                    # back button
                     back_rect = pygame.Rect(
-                        0, 290, width, 40
+                        0,
+                        290,
+                        width,
+                        40
                     )
 
                     if back_rect.collidepoint(event.pos):
 
                         if renaming_save:
-                            # save_slots()
                             renaming_save = False
+                            rename_text = ""
+                            message = ""
 
                         current_state = "MAIN"
                         selected_save = None
 
-                        # renaming save slots
-                        if card_rect.collidepoint(event.pos):
-
-                            name_text = font_menu.render(
-                                save_slots[index]["name"],
-                                False,
-                                (240, 240, 240)
-                            )
-
-                            name_rect = name_text.get_rect()
-                            name_rect.center = (
-                                card_rect.centerx,
-                                card_rect.y + 35
-                            )
-
-                        
-                            if name_rect.collidepoint(event.pos):
-
-                                # when you select save 1 you can't rename save 2, and vice versa
-                                if selected_save == index:
-                                    renaming_save = True
-                                    rename_text = save_slots[index]["name"]
-
-                                else:
-                                    selected_save = index
-                                    renaming_save = False
-
-                            elif selected_save == index:
-                                print(
-                                    "OPEN SAVE:",
-                                    save_slots[index]["name"]
-                                )
-
-                            else:
-                                selected_save = index
-
-                    back_rect = pygame.Rect(
-                        0, 290, width, 40
-                    )
-
-                    if back_rect.collidepoint(event.pos):
-                        current_state = "MAIN"
-                        selected_save = None
-                        renaming_save = None
-        #keyboard
+        # keyboard
         elif event.type == pygame.KEYDOWN:
 
             if renaming_save:
-                # makes sure that if they press enter the renaming isn't implemeted, but they are still editing
+
                 if event.key == pygame.K_RETURN:
+
                     if save_rename():
                         renaming_save = False
-
+                        rename_text = ""
 
                 elif event.key == pygame.K_BACKSPACE:
+
                     rename_text = rename_text[:-1]
 
-                # to add a new letter/character if there is anything "else"
                 else:
-                    if event.unicode.isprintable() and len(rename_text) < max_name_length:
-                        rename_text += event.unicode
 
+                    if event.unicode.isprintable():
+
+                        if len(rename_text) < max_name_length:
+                            rename_text += event.unicode
+
+                        else:
+                            message = "Max 10 Characters."
 
     pygame.display.update()
     clock.tick(60)
