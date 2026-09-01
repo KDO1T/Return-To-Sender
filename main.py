@@ -42,15 +42,16 @@ total_map_h = sum(row[0].map_h for row in maps)
 
 
 # *--PLAYER STUFF--*
-player_sprite = pygame.image.load('sprites/ajimmus.png')
+player_sprite = pygame.image.load('sprites/willie.png')
 moving_up = False
 moving_down = False
 moving_right = False
 moving_left = False
 player_rect = pygame.Rect(250, 250, player_sprite.get_width(), player_sprite.get_height()) #player hitbox
 player_y_momentum = 0 # <-- gravity enacted on the player
-max_air_jumps = 1
-air_jumps = 0
+press_space = False
+max_air_jumps = 0
+air_jumps = max_air_jumps
 on_ground = None
 
 object_rect = pygame.Rect(300, 300, 250,250)
@@ -116,17 +117,17 @@ while True:
             if event.key == pygame.K_a: #pressing A (left)
                 moving_left = True
             if event.key == pygame.K_SPACE:
-
-                #positive y momentum is downward | negative y momentum is upward
-                if on_ground is True: #player touching ground
-                    jump = True
-                    air_jumps = max_air_jumps
-                else: #player is in the air
-                    if air_jumps > 0: #if player has an extra jump, then jump then deduct from remaining jumps
-                        jump = True
-                        air_jumps -= 1
-                    else:
-                        pass
+                press_space = True
+                # #positive y momentum is downward | negative y momentum is upward
+                # if on_ground is True: #player touching ground
+                #     jump = True
+                #     air_jumps = max_air_jumps
+                # else: #player is in the air
+                #     if air_jumps > 0: #if player has an extra jump, then jump then deduct from remaining jumps
+                #         jump = True
+                #         air_jumps -= 1
+                #     else:
+                #         pass
              
 
 
@@ -191,9 +192,7 @@ while True:
 
     player_rect.y += player_movement[1]
 
-    #jump
-    if jump == True:
-        player_y_momentum = -4.5
+    
 
 
     for tile in tile_rect:
@@ -207,6 +206,28 @@ while True:
                 player_rect.top = tile.bottom
                 player_y_momentum = 0 # <-- same with this
 
+
+    #                    *--JUMP--*
+    
+    #positive y momentum is downward | negative y momentum is upward
+    if press_space == True:
+        if on_ground is True: #player touching ground
+            jump = True
+            air_jumps = max_air_jumps
+        else: #player is in the air
+            if air_jumps > 0: #if player has an extra jump, then jump then deduct from remaining jumps
+                jump = True
+                air_jumps -= 1
+            else:
+                pass
+    else:
+         pass
+
+    press_space = False #just returns it back to the original state so it doesn't infintely jump
+
+    if jump == True:
+                player_y_momentum = -4.5
+                     
                                          # *--RENDERING--*
  #------------------------------------
 
