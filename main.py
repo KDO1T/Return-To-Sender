@@ -42,7 +42,7 @@ total_map_h = sum(row[0].map_h for row in maps)
 
 
 # *--PLAYER STUFF--*
-player_sprite = pygame.image.load('ajimmus.png')
+player_sprite = pygame.image.load('sprites/ajimmus.png')
 moving_up = False
 moving_down = False
 moving_right = False
