@@ -2,6 +2,7 @@ import pygame, sys
 from pygame.locals import *
 from spritesheet import Spritesheet
 from tilemap import *
+from player import Player
 pygame.init()
 
 #grab resolution for the users monitor
@@ -42,6 +43,21 @@ total_map_h = sum(row[0].map_h for row in maps)
 
 
 # *--PLAYER STUFF--*
+player = Player(
+    Name=None,
+    HP=None,    
+    ATK=None, 
+    CRIT_DMG=None, 
+    CRIT_CHANCE=None, 
+    LEVEL=None, 
+    EXP=None, 
+    DOLLARS=None, 
+    S_COIN=None
+)
+
+player.show_stat()
+
+
 player_sprite = pygame.image.load('sprites/willie.png')
 moving_up = False
 moving_down = False
@@ -54,7 +70,6 @@ max_air_jumps = 0
 air_jumps = max_air_jumps
 on_ground = None
 
-object_rect = pygame.Rect(300, 300, 250,250)
 
 # *--TILES OBJECTS--*
 tile_rect = []
@@ -118,16 +133,6 @@ while True:
                 moving_left = True
             if event.key == pygame.K_SPACE:
                 press_space = True
-                # #positive y momentum is downward | negative y momentum is upward
-                # if on_ground is True: #player touching ground
-                #     jump = True
-                #     air_jumps = max_air_jumps
-                # else: #player is in the air
-                #     if air_jumps > 0: #if player has an extra jump, then jump then deduct from remaining jumps
-                #         jump = True
-                #         air_jumps -= 1
-                #     else:
-                #         pass
              
 
 
@@ -227,7 +232,21 @@ while True:
 
     if jump == True:
                 player_y_momentum = -4.5
-                     
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
                                          # *--RENDERING--*
  #------------------------------------
 
@@ -244,8 +263,6 @@ while True:
 
     camera_x = max(0, min(camera_x, max_cam_x))
     camera_y = max(0, min(camera_y, max_cam_y))
-
-
 
 
 
@@ -274,7 +291,6 @@ while True:
 
 
     screen.blit(scaled_resolution,(0,0))   #creates a window to be displayed
-
 
     pygame.display.update() #updates the screen
     clock.tick(60) #ensures framerate is consistently 60fps
