@@ -69,7 +69,9 @@ press_space = False
 max_air_jumps = 0
 air_jumps = max_air_jumps
 on_ground = None
+x_flip = False
 
+# *--------------------------------------------------------------------------------------------------------*
 
 # *--TILES OBJECTS--*
 tile_rect = []
@@ -282,8 +284,22 @@ while True:
         current_y += row[0].map_h
 
     player_render_pos = (player_rect.x - camera_x, player_rect.y - camera_y) #centers player on screen
-    canvas.blit(player_sprite, player_render_pos) #draws the player onto the location of its hitbox*
 
+
+    #flipping code
+    
+    if moving_left == True:
+        x_flip = True
+    elif moving_right == True:
+        x_flip = False
+    else:
+         pass
+    
+    canvas.blit(pygame.transform.flip(player_sprite, x_flip, False), player_render_pos) 
+
+    #^^ draws the player onto the location of its hitbox*
+    # x_flip tells the game whether it should flip the direction of the sprite on the x axis or not.
+    # all sprites are all originally drawn to the right side.
 
 
     #scale the screen
