@@ -68,11 +68,12 @@ player = Player(
 
 
 
+
 moving_up = False
 moving_down = False
 moving_right = False
 moving_left = False
-player_rect = pygame.Rect(20, 20, 32, 32)
+
 player_y_momentum = 0 # <-- gravity enacted on the player
 press_space = False
 max_air_jumps = 0
@@ -95,12 +96,58 @@ for row in maps:
         current_x += tile_map.map_w
     current_y += row[0].map_h
 
+# *------------------------------ANIMATION------------------------------------------------------------------------
+
+
+idle_frames = [pygame.image.load(f"animations/idle/idle_{i}.png") for i in range(1, 7)]
+movement_frames = [pygame.image.load(f"animations/walking/walking_{i}.png") for i in range(1, 6)]
+jumping_frames = [pygame.image.load(f"animations/jumping/jumping_{i}.png") for i in range(1, 5)]
+falling_frames = [pygame.image.load(f"animations/falling/falling_{i}.png") for i in range(1, 4)]
+current_frames = []
+animated_frames = []
+
+
+mode = 0 #idle = 0, moving = 1, jumping = 2, falling = 3
+active_frame = 0
+count = 0
+
+def update_player ( mod, tick):
+    tick += 1
+
+    if tick >= 60:
+         tick = 0
+
+    if mod == 0: #idle
+        action = tick //10
+    if mod == 1: #moving
+        action = tick //12
+    if mod == 2: #jumping
+        action = tick //15
+    if mod == 3: #falling
+        action = tick //20
+
+
+            
+    return action, tick
+
+
+player_sprite = idle_frames[active_frame]
+player_rect = pygame.Rect(400, 200, player_sprite.get_width(), player_sprite.get_height()) #player hitbox
+
+
+
 
 #note for rendering: whatever is first rendered in the loop will be behind while whatever is last rendered in the loop will be in the very front
 # *--GAME LOOP--*
 while True: 
 
+
+
     jump = False
+        
+
+
+
        # *--INPUT DETECTION--*
     for event in pygame.event.get(): #just detects if any 'events' occur
 
@@ -144,11 +191,14 @@ while True:
                 moving_left = True
             if event.key == pygame.K_SPACE:
                 press_space = True
-             
 
 
             # *--KEY IS LET GO--*  
         if event.type == pygame.KEYUP:
+
+            if event.key == pygame.K_a and event.key == pygame.K_d and event.key == pygame.K_SPACE: #nothing is being touched
+                mode = 0
+                current_frames = idle_frames    
             if event.key == pygame.K_w:#let go of W (up)
                 moving_up = False
             if event.key == pygame.K_s:#let go of S (down)
@@ -242,24 +292,37 @@ while True:
     press_space = False #just returns it back to the original state so it doesn't infintely jump
 
     if jump == True:
-                player_y_momentum = -4.5
+        player_y_momentum = -4.5
+
+                                # *--ANIMATION--*
+ #-----------------------------------------------------------------------------------------------------
+
+    if on_ground == False and player_y_momentum > 0: #falling animation
+        mode = 3
+        current_frames = falling_frames
+    elif on_ground == False and player_y_momentum <= 0: #jumping animation
+        mode = 2
+        current_frames = jumping_frames
+    elif moving_right or moving_left:
+            mode = 1
+            current_frames = movement_frames
+    else: #idle
+        mode = 0
+        current_frames = idle_frames
+
+    #safe_guard // redudant later remove in final
+    if len(current_frames) < 0:
+        current_frames = idle_frames
+
+    animated_frames = current_frames
 
 
 
 
 
 
-
-
-
-
-
-
-
-
-
-                                         # *--RENDERING--*
- #------------------------------------
+                                # *--RENDERING--*
+ #----------------------------------------------------------------------------------------------------------
 
 
 
@@ -304,9 +367,12 @@ while True:
     else:
          pass
 
-    player_sprite.update() #updates player sprite
+
     
-    canvas.blit(pygame.transform.flip((player_sprite.image), x_flip, False), player_render_pos) 
+    active_frame, count = update_player(mode, count)
+    player_sprite = animated_frames[active_frame]
+    canvas.blit(pygame.transform.flip(player_sprite, x_flip, False), player_render_pos) 
+
 
     #^^ draws the player onto the location of its hitbox*
     # x_flip tells the game whether it should flip the direction of the sprite on the x axis or not.
