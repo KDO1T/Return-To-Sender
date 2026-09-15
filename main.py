@@ -91,7 +91,7 @@ for row in maps:
 #                 'animations/idle/idle_5.png', 'animations/idle/idle_6.png']
 
 idle_frames = [pygame.image.load(f"animations/idle/idle_{i}.png") for i in range(1, 7)]
-movement_frames = []
+movement_frames = [pygame.image.load(f"animations/idle/idle_{i}.png") for i in range(1, 6)]
 jumping_frames = []
 current_frames = []
 
@@ -107,19 +107,12 @@ def update_player ( mod, tick):
 
     if tick >= 60:
          tick = 0
-    if mod == 0:
-        if tick <= 60:
-            action = 5
-        if tick <= 50:
-            action = 4
-        if tick <= 40:
-            action = 3
-        if tick <= 30:
-            action = 2
-        if tick <= 20:
-            action = 1
-        if tick <= 10:
-            action = 0
+
+    if mod == 0: #idle
+        action = tick //10
+    if mod == 1: #moving
+        action = tick //12
+
 
     # if mod == 1:
     #     if tick <= 10:
@@ -152,7 +145,8 @@ def update_player ( mod, tick):
     return action, tick
 
 
-
+player_sprite = idle_frames[active_frame]
+player_rect = pygame.Rect(400, 200, player_sprite.get_width(), player_sprite.get_height()) #player hitbox
 
 
 
@@ -161,8 +155,6 @@ def update_player ( mod, tick):
 # *--GAME LOOP--*
 while True: 
 
-    player_sprite = idle_frames[active_frame]
-    player_rect = pygame.Rect(400, 200, player_sprite.get_width(), player_sprite.get_height()) #player hitbox
 
 
     jump = False
