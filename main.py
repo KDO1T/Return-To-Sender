@@ -2,7 +2,7 @@ import pygame, sys
 from pygame.locals import *
 from spritesheet import Spritesheet
 from tilemap import *
-from player import Player
+from player import Player, Player_Sprite
 pygame.init()
 
 #grab resolution for the users monitor
@@ -41,8 +41,17 @@ maps = [[TileMap(file,sprites) for file in row] for row in map_grid]            
 total_map_w = sum(tile_maps.map_w  for tile_maps in maps[0])   #loops through maps list
 total_map_h = sum(row[0].map_h for row in maps)
 
-
+ 
 # *--PLAYER STUFF--*
+
+character_sprites = pygame.sprite.Group()
+player_sprite = Player_Sprite(100,100)
+player_sprite.load_idle_sprites()
+
+
+
+character_sprites.add(player_sprite)
+
 player = Player(
     Name=None,
     HP=None,    
@@ -55,15 +64,15 @@ player = Player(
     S_COIN=None
 )
 
-player.show_stat()
 
 
-player_sprite = pygame.image.load('sprites/willie.png')
+
+
 moving_up = False
 moving_down = False
 moving_right = False
 moving_left = False
-player_rect = pygame.Rect(250, 250, player_sprite.get_width(), player_sprite.get_height()) #player hitbox
+player_rect = pygame.Rect(20, 20, 32, 32)
 player_y_momentum = 0 # <-- gravity enacted on the player
 press_space = False
 max_air_jumps = 0
@@ -294,8 +303,10 @@ while True:
         x_flip = False
     else:
          pass
+
+    player_sprite.update() #updates player sprite
     
-    canvas.blit(pygame.transform.flip(player_sprite, x_flip, False), player_render_pos) 
+    canvas.blit(pygame.transform.flip((player_sprite.image), x_flip, False), player_render_pos) 
 
     #^^ draws the player onto the location of its hitbox*
     # x_flip tells the game whether it should flip the direction of the sprite on the x axis or not.
@@ -304,7 +315,6 @@ while True:
 
     #scale the screen
     scaled_resolution = pygame.transform.scale(canvas, (screen_state_w, screen_state_h))
-
 
     screen.blit(scaled_resolution,(0,0))   #creates a window to be displayed
 
