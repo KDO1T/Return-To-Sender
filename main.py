@@ -58,12 +58,11 @@ player = Player(
 player.show_stat()
 
 
-player_sprite = pygame.image.load('sprites/willie.png')
+
 moving_up = False
 moving_down = False
 moving_right = False
 moving_left = False
-player_rect = pygame.Rect(250, 250, player_sprite.get_width(), player_sprite.get_height()) #player hitbox
 player_y_momentum = 0 # <-- gravity enacted on the player
 press_space = False
 max_air_jumps = 0
@@ -86,12 +85,91 @@ for row in maps:
         current_x += tile_map.map_w
     current_y += row[0].map_h
 
+# *------------------------------ANIMATION------------------------------------------------------------------------
+
+# idle_frames = ['animations/idle/idle_1.png', 'animations/idle/idle_2.png', 'animations/idle/idle_3.png', 'animations/idle/idle_4.png',
+#                 'animations/idle/idle_5.png', 'animations/idle/idle_6.png']
+
+idle_frames = [pygame.image.load(f"animations/idle/idle_{i}.png") for i in range(1, 7)]
+movement_frames = []
+jumping_frames = []
+current_frames = []
+
+if len(current_frames) == 0:
+    current_frames = idle_frames
+
+mode = 0 #idle = 0, moving = 1, jumping = 2
+active_frame = 0
+count = 0
+
+def update_player ( mod, tick):
+    tick += 1
+
+    if tick >= 60:
+         tick = 0
+    if mod == 0:
+        if tick <= 60:
+            action = 5
+        if tick <= 50:
+            action = 4
+        if tick <= 40:
+            action = 3
+        if tick <= 30:
+            action = 2
+        if tick <= 20:
+            action = 1
+        if tick <= 10:
+            action = 0
+
+    # if mod == 1:
+    #     if tick <= 10:
+    #         action = 0
+    #     if tick <= 20:
+    #         action = 1
+    #     if tick <= 30:
+    #         action = 2
+    #     if tick <= 40:
+    #         action = 3
+    #     if tick <= 50:
+    #         action = 4
+    #     if tick <= 60:
+    #         action = 5
+
+    # if mod == 2:
+    #     if tick <= 10:
+    #         action = 0
+    #     if tick <= 20:
+    #         action = 1
+    #     if tick <= 30:
+    #         action = 2
+    #     if tick <= 40:
+    #         action = 3
+    #     if tick <= 50:
+    #         action = 4
+    #     if tick <= 60:
+    #         action = 5
+            
+    return action, tick
+
+
+
+
+
+
 
 #note for rendering: whatever is first rendered in the loop will be behind while whatever is last rendered in the loop will be in the very front
 # *--GAME LOOP--*
 while True: 
 
+    player_sprite = idle_frames[active_frame]
+    player_rect = pygame.Rect(400, 200, player_sprite.get_width(), player_sprite.get_height()) #player hitbox
+
+
     jump = False
+        
+
+
+
        # *--INPUT DETECTION--*
     for event in pygame.event.get(): #just detects if any 'events' occur
 
@@ -131,15 +209,25 @@ while True:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_d: #pressing D (right)
                 moving_right = True
+                mode = 1
+                current_frames = movement_frames
             if event.key == pygame.K_a: #pressing A (left)
                 moving_left = True
+                mode = 1
+                current_frames = movement_frames
             if event.key == pygame.K_SPACE:
                 press_space = True
+                mode = 2
+                current_frames = jumping_frames
              
 
 
             # *--KEY IS LET GO--*  
         if event.type == pygame.KEYUP:
+
+            if event.key == pygame.K_a and event.key == pygame.K_d and event.key == pygame.K_SPACE: #nothing is being touched
+                mode = 0
+                current_frames = idle_frames    
             if event.key == pygame.K_w:#let go of W (up)
                 moving_up = False
             if event.key == pygame.K_s:#let go of S (down)
@@ -238,17 +326,6 @@ while True:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
                                          # *--RENDERING--*
  #------------------------------------
 
@@ -294,7 +371,11 @@ while True:
         x_flip = False
     else:
          pass
+
+
     
+    active_frame, count = update_player(mode, count)
+    player_sprite = current_frames[active_frame]
     canvas.blit(pygame.transform.flip(player_sprite, x_flip, False), player_render_pos) 
 
     #^^ draws the player onto the location of its hitbox*
