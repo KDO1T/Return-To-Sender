@@ -22,13 +22,13 @@ camera_speed=5 #will make this the difference in current player coordinates
 #base window status
 status = RESIZABLE
 
-clock = pygame.time.Clock() #assigning the clock function to a variable to use for the fps in the gameloop
-
 #1. initiliaze pygame, 2. names the window, 3. sets the window size and sets its paramaters
-pygame.init()
 pygame.display.set_caption("Return To Sender") 
 canvas = pygame.Surface((base_res_x, base_res_y))
 screen = pygame.display.set_mode((screen_state_w, screen_state_h), status)
+
+
+clock = pygame.time.Clock() #assigning the clock function to a variable to use for the fps in the gameloop
 
 # *-- MAP STUFF --*
 sprites = Spritesheet('spritesheet.png')
@@ -44,13 +44,13 @@ total_map_h = sum(row[0].map_h for row in maps)
  
 # *--PLAYER STUFF--*
 
-character_sprites = pygame.sprite.Group()
-player_sprite = Player_Sprite(100,100)
-player_sprite.load_idle_sprites()
+# character_sprites = pygame.sprite.Group()
+# player_sprite = Player_Sprite(100,100)
+# player_sprite.load_idle_sprites()
+# character_sprites.add(player_sprite)
 
 
 
-character_sprites.add(player_sprite)
 
 player = Player(
     Name=None,
@@ -76,7 +76,7 @@ moving_left = False
 
 player_y_momentum = 0 # <-- gravity enacted on the player
 press_space = False
-max_air_jumps = 0
+max_air_jumps = 2
 air_jumps = max_air_jumps
 on_ground = None
 x_flip = False
@@ -98,41 +98,78 @@ for row in maps:
 
 # *------------------------------ANIMATION------------------------------------------------------------------------
 
+jimmy_sheet = Spritesheet('animations/spritesheets/red_jimmy_sheet.png')
 
-idle_frames = [pygame.image.load(f"animations/idle/idle_{i}.png") for i in range(1, 7)]
-movement_frames = [pygame.image.load(f"animations/walking/walking_{i}.png") for i in range(1, 6)]
-jumping_frames = [pygame.image.load(f"animations/jumping/jumping_{i}.png") for i in range(1, 5)]
-falling_frames = [pygame.image.load(f"animations/falling/falling_{i}.png") for i in range(1, 4)]
+jimmy_frames = []
 current_frames = []
-animated_frames = []
-
-
-mode = 0 #idle = 0, moving = 1, jumping = 2, falling = 3
-active_frame = 0
+index = 0
+mode = 0
 count = 0
 
-def update_player ( mod, tick):
-    tick += 1
+# 0-5 idle, 6-10 walk, 11-14 jump, 15-17 fall
+# -idle       
+for i in range(6):
+    filename = f'idle_{i}'
+    jimmy_frames.append(jimmy_sheet.parse_sprite(filename))
 
-    if tick >= 60:
-         tick = 0
+# -walk
+for i in range(5):
+    filename = f'walk_{i}'
+    jimmy_frames.append(jimmy_sheet.parse_sprite(filename))
+
+# -jump
+for i in range(4):
+    filename = f'jump_{i}'
+    jimmy_frames.append(jimmy_sheet.parse_sprite(filename))
+
+# -fall
+for i in range(3):
+    filename = f'fall_{i}'
+    jimmy_frames.append(jimmy_sheet.parse_sprite(filename))
+
+
+# 0-5 idle, 6-10 walk, 11-14 jump, 15-17 fall
+# 0=idle, 1=walk, 2=jump, 3=fall
+
+def update_action (mod):
 
     if mod == 0: #idle
-        action = tick //10
-    if mod == 1: #moving
-        action = tick //12
+        current_frames = jimmy_frames[0:5]
+
+    if mod == 1: #walk
+        current_frames = jimmy_frames[6:10]
+
+    if mod == 2: #jump
+        current_frames = jimmy_frames[11:14]
+
+    if mod == 3: #fall
+        current_frames = jimmy_frames[15:17]
+
+    return current_frames
+
+
+def update_player_frame (mod, frame, tick): #math for frame 
+    tick += 1
+
+    if tick == 60:
+        tick = 0
+
+    if mod == 0: #idling
+        frame = (tick // 10) % len(current_frames)
+
+    if mod == 1: #walking
+        frame = (tick // 12) % len(current_frames)
+        
     if mod == 2: #jumping
-        action = tick //15
+        frame = (tick // 15) % len(current_frames)
+        
     if mod == 3: #falling
-        action = tick //20
+        frame = (tick // 20) % len(current_frames)
+
+    return tick, frame
 
 
-            
-    return action, tick
-
-
-player_sprite = idle_frames[active_frame]
-player_rect = pygame.Rect(400, 200, player_sprite.get_width(), player_sprite.get_height()) #player hitbox
+player_rect = pygame.Rect(100, 200, 32, 32) #player hitbox
 
 
 
@@ -197,8 +234,7 @@ while True:
         if event.type == pygame.KEYUP:
 
             if event.key == pygame.K_a and event.key == pygame.K_d and event.key == pygame.K_SPACE: #nothing is being touched
-                mode = 0
-                current_frames = idle_frames    
+                mode = 0  
             if event.key == pygame.K_w:#let go of W (up)
                 moving_up = False
             if event.key == pygame.K_s:#let go of S (down)
@@ -296,29 +332,16 @@ while True:
 
                                 # *--ANIMATION--*
  #-----------------------------------------------------------------------------------------------------
+    #chooses what type of action the player is doing to then determine animation playing
 
     if on_ground == False and player_y_momentum > 0: #falling animation
         mode = 3
-        current_frames = falling_frames
     elif on_ground == False and player_y_momentum <= 0: #jumping animation
         mode = 2
-        current_frames = jumping_frames
     elif moving_right or moving_left:
-            mode = 1
-            current_frames = movement_frames
+        mode = 1
     else: #idle
         mode = 0
-        current_frames = idle_frames
-
-    #safe_guard // redudant later remove in final
-    if len(current_frames) < 0:
-        current_frames = idle_frames
-
-    animated_frames = current_frames
-
-
-
-
 
 
                                 # *--RENDERING--*
@@ -368,11 +391,11 @@ while True:
          pass
 
 
-    
-    active_frame, count = update_player(mode, count)
-    player_sprite = animated_frames[active_frame]
+    current_frames = update_action(mode) #determines the current type of animation playing
+    count, index = update_player_frame(mode, index, count) #update frame played
+    player_sprite = current_frames[index] #determines the image/sprite which will be displayed on player pos
     canvas.blit(pygame.transform.flip(player_sprite, x_flip, False), player_render_pos) 
-
+     
 
     #^^ draws the player onto the location of its hitbox*
     # x_flip tells the game whether it should flip the direction of the sprite on the x axis or not.
