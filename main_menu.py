@@ -4,9 +4,6 @@ import pygame
 
 pygame.init()
 
-# USE PYGAME WIDGETS FOR THE BRIGHTNESS SLIDER AND AUDIOS. AND A DROPDOWN MENU IN THE DISPLAY RESOLUTIONS IN THE VIDEOS SECTION
-# FOR NOW JUST USE RECTANGLES TO HAVE THEIR SPOTS AND FOR VISUAL PURPOSES
-
 
 # resolution
 resolution = pygame.display.get_desktop_sizes()
@@ -120,6 +117,10 @@ fullscreen = False
 master_volume = 100
 music_volume = 80
 sfx_volume = 100
+
+# Drag state for sliders
+drag = False
+dragging_slider = None
 
 
 def save_rename():
@@ -513,12 +514,12 @@ while True:
             (240, 240, 240)
         )
         bright_label_rect = bright_label.get_rect(
-            midleft=(panel_rect.left + 25, 225)
+            midleft=(panel_rect.left + 25, 250)
         )
         canvas.blit(bright_label, bright_label_rect)
 
         slider_x = 270
-        slider_y = 218
+        slider_y = 243
         slider_width = 220
 
         pygame.draw.rect(
@@ -880,7 +881,6 @@ while True:
 
                 mouse_pos = (mouse_x, mouse_y)
 
-
                 if current_state == "MAIN":
 
                     for index, option in enumerate(main_menu):
@@ -1099,7 +1099,7 @@ while True:
 
                             dropdown_rect = pygame.Rect(
                                 270,
-                                148 + (index * 30),
+                                145 + (index * 30),
                                 245,
                                 30
                             )
@@ -1144,12 +1144,14 @@ while True:
                     # Brightness slider
                     brightness_slider_rect = pygame.Rect(
                         270,
-                        210,
+                        241,
                         220,
-                        30
+                        18
                     )
 
                     if brightness_slider_rect.collidepoint(mouse_pos):
+                        drag = True
+                        dragging_slider = "brightness"
                         brightness = int(
                             (mouse_x - 270) / 220 * 100
                         )
@@ -1180,7 +1182,6 @@ while True:
 
                     if back_rect.collidepoint(mouse_pos):
                         current_state = "OPTIONS"
-                        
 
                     # Audio slider hitboxes
                     audio_sliders = [
@@ -1193,12 +1194,14 @@ while True:
 
                         slider_rect = pygame.Rect(
                             255,
-                            slider_y - 15,
+                            slider_y - 9,
                             250,
-                            30
+                            18
                         )
 
                         if slider_rect.collidepoint(mouse_pos):
+                            drag = True
+                            dragging_slider = slider_name
 
                             value = int(
                                 (mouse_x - 255) / 250 * 100
@@ -1211,6 +1214,43 @@ while True:
                                 music_volume = value
                             elif slider_name == "sfx":
                                 sfx_volume = value
+
+                            break
+
+    # Continuous slider dragging
+    if drag:
+
+        if pygame.mouse.get_pressed()[0]:
+
+            mouse_x = pygame.mouse.get_pos()[0] * base_res_x / screen_state_w
+
+            if dragging_slider == "brightness" and current_state == "VIDEO":
+                brightness = int(
+                    (mouse_x - 270) / 220 * 100
+                )
+                brightness = max(0, min(100, brightness))
+
+            elif dragging_slider == "master" and current_state == "AUDIO":
+                master_volume = int(
+                    (mouse_x - 255) / 250 * 100
+                )
+                master_volume = max(0, min(100, master_volume))
+
+            elif dragging_slider == "music" and current_state == "AUDIO":
+                music_volume = int(
+                    (mouse_x - 255) / 250 * 100
+                )
+                music_volume = max(0, min(100, music_volume))
+
+            elif dragging_slider == "sfx" and current_state == "AUDIO":
+                sfx_volume = int(
+                    (mouse_x - 255) / 250 * 100
+                )
+                sfx_volume = max(0, min(100, sfx_volume))
+
+        else:
+            drag = False
+            dragging_slider = None
 
     # scale the canvas to the current window size
     scaled_resolution = pygame.transform.scale(
