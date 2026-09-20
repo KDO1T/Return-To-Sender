@@ -2,6 +2,7 @@ import pygame, sys
 from pygame.locals import *
 from spritesheet import Spritesheet
 from tilemap import *
+import config
 pygame.init()
 
 #grab resolution for the users monitor
@@ -274,6 +275,15 @@ while True:
 
 
     screen.blit(scaled_resolution,(0,0))   #creates a window to be displayed
+    
+    # Apply brightness overlay
+    if config.brightness < 100:
+        # Calculate alpha: 255 when brightness=0, 0 when brightness=100
+        alpha = int(255 * (1 - config.brightness / 100))
+        brightness_overlay = pygame.Surface((screen_state_w, screen_state_h))
+        brightness_overlay.set_alpha(alpha)
+        brightness_overlay.fill((0, 0, 0))
+        screen.blit(brightness_overlay, (0, 0))
 
 
     pygame.display.update() #updates the screen

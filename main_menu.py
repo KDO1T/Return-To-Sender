@@ -1,6 +1,7 @@
 from sys import exit
 
 import pygame
+import config
 
 pygame.init()
 
@@ -110,7 +111,6 @@ resolution_options = [
     (1920, 1080)
 ]
 selected_resolution = 1
-brightness = 100
 fullscreen = False
 
 # Audio values (0 - 100)
@@ -529,7 +529,7 @@ while True:
             2
         )
 
-        handle_x = slider_x + (brightness / 100 * slider_width)
+        handle_x = slider_x + (config.brightness / 100 * slider_width)
 
         pygame.draw.rect(
             canvas,
@@ -1115,15 +1115,15 @@ while True:
                                 window_w = selected_width
                                 window_h = selected_height
                                 
-                                # Set the existing screen_state_w and screen_state_h variables to that width and height
-                                screen_state_w = window_w
-                                screen_state_h = window_h
-                                
-                                # Recreate the Pygame display using pygame.display.set_mode() with the selected resolution and the existing status variable
-                                screen = pygame.display.set_mode(
-                                    (screen_state_w, screen_state_h),
-                                    status
-                                )
+                                # Only update the active window when in windowed mode
+                                if status == pygame.RESIZABLE:
+                                    screen_state_w = window_w
+                                    screen_state_h = window_h
+                                    
+                                    screen = pygame.display.set_mode(
+                                        (screen_state_w, screen_state_h),
+                                        status
+                                    )
                                 
                                 break
 
@@ -1170,10 +1170,10 @@ while True:
                     if brightness_slider_rect.collidepoint(mouse_pos):
                         drag = True
                         dragging_slider = "brightness"
-                        brightness = int(
+                        config.brightness = int(
                             (mouse_x - 270) / 220 * 100
                         )
-                        brightness = max(0, min(100, brightness))
+                        config.brightness = max(0, min(100, config.brightness))
 
 
                 elif current_state == "CONTROLS":
@@ -1243,10 +1243,10 @@ while True:
             mouse_x = pygame.mouse.get_pos()[0] * base_res_x / screen_state_w
 
             if dragging_slider == "brightness" and current_state == "VIDEO":
-                brightness = int(
+                config.brightness = int(
                     (mouse_x - 270) / 220 * 100
                 )
-                brightness = max(0, min(100, brightness))
+                config.brightness = max(0, min(100, config.brightness))
 
             elif dragging_slider == "master" and current_state == "AUDIO":
                 master_volume = int(
