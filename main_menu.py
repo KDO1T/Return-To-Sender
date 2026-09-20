@@ -1107,6 +1107,24 @@ while True:
                             if dropdown_rect.collidepoint(mouse_pos):
                                 selected_resolution = index
                                 dropdown_open = False
+                                
+                                # Get the selected (width, height) from resolution_options using selected_resolution
+                                selected_width, selected_height = resolution_options[selected_resolution]
+                                
+                                # Set the existing window_w and window_h variables to that width and height
+                                window_w = selected_width
+                                window_h = selected_height
+                                
+                                # Set the existing screen_state_w and screen_state_h variables to that width and height
+                                screen_state_w = window_w
+                                screen_state_h = window_h
+                                
+                                # Recreate the Pygame display using pygame.display.set_mode() with the selected resolution and the existing status variable
+                                screen = pygame.display.set_mode(
+                                    (screen_state_w, screen_state_h),
+                                    status
+                                )
+                                
                                 break
 
                     # Fullscreen toggle
