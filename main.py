@@ -138,13 +138,14 @@ zombies = []
 zombies_render_positions = [] #acts the same as player render pos.
 zombies_movements = [] #holds the x and y values for zombie movement
 zombie_ground_check = [] #holds boolean if zombie is in the air or not
+zombie_move_choices = []
 zombies_y_momentums = []
-zombie_y_momentum = 0
+zombie_y_mom = 0
+choice_count = 0 #stores the amount of frames it has been to make a new choice
 
 for i in range(10):
     zombie = pygame.Rect(i*128, 200, 32,32)
     zombies.append(zombie)
-
 
 
 
@@ -404,31 +405,53 @@ while True:
 # *---------------------------------------ENTITIES---------------------------------------------------------
 
 
+    
+
+    # 60*x frames to tell the game to change what action the zombies should be doing
+    choice_count += 1
+    if choice_count >= 120: #120 means every 2 seconds since 60x2=120
+        choice_count = 0
+        change_action = True
+    else:
+        change_action = False
+
+    #IF 
+    if change_action == True:
+        zombie_move_choices = []
+        for i in range(len(zombies)):
+            #determining left and right movement
+                action_pool = ['Left', 'Right', 'Still']
+                action_weightage = [15,15,70]
+                zombie_action = random.choices(action_pool, weights=action_weightage, k=1)[0]
+                zombie_move_choices.append(zombie_action)
+                
+
     #ZOMBIE MOVEMENT
     zombies_movements = []
     for i in range(len(zombies)):
-        zombie_movement = [0,0]
+        zombie_move = [0,0]
+
         
-        #left and right movement
+        if len(zombie_move_choices) != 0:
+            #move right
+            if zombie_move_choices[i] == 'Right':
+                zombie_move[0] = 2
+                zombies[i].x += zombie_move[0]
 
+            #move left
+            if zombie_move_choices[i] == 'Left':
+                zombie_move[0]= -2
+                zombies[i].x += zombie_move[0]
 
-        zombie_movement_chance = random.randint(0,180)
-        #random decision to move right
-        if zombie_movement_chance <= 60:
-            zombie_movement[0] = 4
-            zombies[i].x += zombie_movement[0]
+            #dont move
+            if zombie_move_choices[i] == 'Still':
+                pass
 
-        #random decision to move left
-        if zombie_movement_chance >= 120:
-            zombie_movement[0]= -4
-            zombies[i].x += zombie_movement[0]
-    
+        else: 
+            pass
+        
+        zombies_movements.append(zombie_move)
 
-
-
-
-        zombies_movements.append(zombie_movement)
-        #left and right movement code/ zombie ai 
     
 
     #ZOMBIE HORIZONTAL MOVEMENT
@@ -445,12 +468,12 @@ while True:
 
     zombies_y_momentums = []
     for i in range(len(zombies)):
-        zombies_movements[i][1] = zombie_y_momentum
-        zombie_y_momentum += 0.2
-        if zombie_y_momentum > 4.5:
-            zombie_y_momentum = 4.5
+        zombies_movements[i][1] = zombie_y_mom
+        zombie_y_mom += 0.2
+        if zombie_y_mom > 4.5:
+            zombie_y_mom = 4.5
         
-        zombies_y_momentums.append(zombie_y_momentum)
+        zombies_y_momentums.append(zombie_y_mom)
 
         if zombies_y_momentums[i] >= 0 and zombies_y_momentums[i] <= 1: #checks if zombie is in the air
             pass
