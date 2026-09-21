@@ -3,6 +3,7 @@ from pygame.locals import *
 from spritesheet import Spritesheet
 from tilemap import *
 from player import Player, Player_Sprite
+import random
 pygame.init()
 
 #grab resolution for the users monitor
@@ -42,15 +43,7 @@ total_map_w = sum(tile_maps.map_w  for tile_maps in maps[0])   #loops through ma
 total_map_h = sum(row[0].map_h for row in maps)
 
  
-# *--PLAYER STUFF--*
-
-# character_sprites = pygame.sprite.Group()
-# player_sprite = Player_Sprite(100,100)
-# player_sprite.load_idle_sprites()
-# character_sprites.add(player_sprite)
-
-
-
+# *-----------------------------------------------------------PLAYER STUFF---------------------------------------------------------------------*
 
 player = Player(
     Name=None,
@@ -80,6 +73,30 @@ max_air_jumps = 2
 air_jumps = max_air_jumps
 on_ground = None
 x_flip = False
+
+# *--------------------------------------------ENTITIES-------------------------------------------------------*
+
+
+
+#stores the rect of the zombies
+zombies = []
+#to use later for rendering pos
+zombies_render_positions = [] #acts the same as player render pos.
+zombies_movements = [] #holds the x and y values for zombie movement
+zombie_ground_check = [] #holds boolean if zombie is in the air or not
+zombies_y_momentums = []
+zombie_y_momentum = 0
+
+for i in range(10):
+    zombie = pygame.Rect(i*128, 200, 32,32)
+    zombies.append(zombie)
+
+
+
+
+zombie_sprite = pygame.image.load('animations/base_zombie.png')
+
+
 
 # *--------------------------------------------------------------------------------------------------------*
 
@@ -170,7 +187,7 @@ def update_player_frame (mod, frame, tick): #math for frame
 
 
 player_rect = pygame.Rect(100, 200, 32, 32) #player hitbox
-
+#                                   ^^  ^^ change this number to alter player hitbox
 
 
 
@@ -244,8 +261,9 @@ while True:
             if event.key == pygame.K_a: #let go of A (left)
                 moving_left = False
 
+    # *---------------------------------------------------------------------------
 
-    # *--HORIZONTAL MOVEMENT + COLLISIONS--*
+    # *--PLAYER HORIZONTAL MOVEMENT + COLLISIONS--*
 
     player_movement = [0,0]  
 
@@ -258,15 +276,6 @@ while True:
         player_movement[0]= -4
         player_rect.x += player_movement[0]
 
-    #REMOVE LATER
-    if moving_down == True:
-        player_movement[1]= 4
-        player_rect.y += player_movement[1]
-
-    if moving_up == True:
-        player_movement[1]= -4
-        player_rect.y += player_movement[1]
-
     #collisions
     for tile in tile_rect:    
         if player_rect.colliderect(tile):
@@ -278,8 +287,9 @@ while True:
 
 #---------------------------------------------------------------------
 
-    # *-- VERTICAL MOVEMENT + VERTICAL COLLISIONS --*
+    # *-- PLAYER VERTICAL MOVEMENT + VERTICAL COLLISIONS --*
     
+    #PLAYER
     #gravity
     player_movement[1] = player_y_momentum
     
@@ -329,6 +339,76 @@ while True:
 
     if jump == True:
         player_y_momentum = -4.5
+
+# *---------------------------------------ENTITIES---------------------------------------------------------
+
+
+    #ZOMBIE MOVEMENT
+    zombies_movements = []
+    for i in range(len(zombies)):
+        zombie_movement = [0,0]
+        
+        #left and right movement
+
+
+        # zombie_movement_chance = random.randint(0,1000)
+        # #random decision to move right
+        # if zombie_movement_chance <= 50:
+        #     zombie_movement[0] = 4
+        #     zombies[i].x += zombie_movement[0]
+
+        # #random decision to move left
+        # if zombie_movement_chance >= 950:
+        #     zombie_movement[0]= -4
+        #     zombies[i].x += zombie_movement[0]
+    
+
+
+
+
+        zombies_movements.append(zombie_movement)
+        #left and right movement code/ zombie ai 
+    
+
+    #ZOMBIE HORIZONTAL MOVEMENT
+    for tile in tile_rect:    
+        for i in range(len(zombies)):
+            if zombies[i].colliderect(tile):
+                if zombies_movements[i][0] > 0:
+                    zombies[i].right = tile.left
+
+                if zombies_movements[i][0] < 0:
+                    zombies[i].left = tile.right
+            
+    #ZOMBIE VERTICAL MOVEMENT AND GRAVITY + VERTICAL COLLISION
+
+    zombies_y_momentums = []
+    for i in range(len(zombies)):
+        zombies_movements[i][1] = zombie_y_momentum
+        zombie_y_momentum += 0.2
+        if zombie_y_momentum > 4.5:
+            zombie_y_momentum = 4.5
+        
+        zombies_y_momentums.append(zombie_y_momentum)
+
+        if zombies_y_momentums[i] >= 0 and zombies_y_momentums[i] <= 1: #checks if zombie is in the air
+            pass
+        else:
+            zombie_on_ground = False
+
+        zombies[i].y += zombies_movements[i][1]
+
+        for tile in tile_rect:
+            if zombies[i].colliderect(tile):
+                if zombies_movements[i][1] > 0:
+                    zombies[i].bottom = tile.top
+                    zombies_y_momentums[i] = 0 # <-- basically tells the game that i can stop falling now
+                    zombie_on_ground = True
+            
+                if zombies_movements[i][1] < 0:
+                    zombies[i].top = tile.bottom
+                    zombies_y_momentums[i] = 0 # <-- same with this
+
 
                                 # *--ANIMATION--*
  #-----------------------------------------------------------------------------------------------------
@@ -381,6 +461,12 @@ while True:
     player_render_pos = (player_rect.x - camera_x, player_rect.y - camera_y) #centers player on screen
 
 
+
+    zombies_render_positions = []
+    for i in range(len(zombies)):
+        zombie_render_pos = (zombies[i].x - camera_x, zombies[i].y - camera_y)
+        zombies_render_positions.append(zombie_render_pos)
+
     #flipping code
     
     if moving_left == True:
@@ -390,11 +476,15 @@ while True:
     else:
          pass
 
-
+ 
     current_frames = update_action(mode) #determines the current type of animation playing
     count, index = update_player_frame(mode, index, count) #update frame played
     player_sprite = current_frames[index] #determines the image/sprite which will be displayed on player pos
     canvas.blit(pygame.transform.flip(player_sprite, x_flip, False), player_render_pos) 
+
+    for i in range(len(zombies)):
+        canvas.blit(zombie_sprite, (zombies_render_positions[i]))
+
      
 
     #^^ draws the player onto the location of its hitbox*
