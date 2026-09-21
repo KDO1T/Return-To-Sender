@@ -14,17 +14,18 @@ class Tile(pygame.sprite.Sprite):
         surface.blit(self.image,(self.rect.x,self.rect.y))
 
 class TileMap():
-    def __init__(self, mapname, spritesheet):
+    def __init__(self, map_data, spritesheet, tile_size=32):
         self.spritesheet = spritesheet
-        self.tile_size = 32
-        self.start_x = 0
-        self.start_y = 0
-        self.map_data = self.read_csv(mapname)   #takes the values in the the csv file and assigns it to map_data
+        self.tile_size = tile_size
+        self.map_data = map_data
+
         self.map_w = len(self.map_data[0])*self.tile_size   #calculates the number of columns in one row and multiplies it with the tile size (32)
         self.map_h = len(self.map_data)*self.tile_size  #same but with rows
+
         self.map_surface = pygame.Surface((self.map_w, self.map_h)) #creates a surface that is mimics the size of each column and row but sized to the correct tile size
         self.map_surface.set_colorkey((0,0,0))
-        self.tiles, self.rects_list = self.load_tiles(mapname)
+
+        self.tiles, self.rects_list = self.load_tiles(map_data)
         self.load_map() #loads the map
 
     def draw_map(self, surface, camera_x= 0, camera_y=0, offset_x=0, offset_y=0):
@@ -37,24 +38,23 @@ class TileMap():
             tile.draw(self.map_surface) #draws all the tiles (after loading the tile function) onto the map surface
 
     #READ CSV TO PARSE
-    def read_csv(self, mapname):
-        map = []
-        with open(mapname) as data:
-            data = csv.reader(data, delimiter=",")  #reads the data by separating it from each comma
-            for row in data:
-                map.append(list(row)) #appends one row as one list into a bigger list (map[])
-        return map
+    # def read_csv(self, mapname):
+    #     map = []
+    #     with open(mapname) as data:
+    #         data = csv.reader(data, delimiter=",")  #reads the data by separating it from each comma
+    #         for row in data:
+    #             map.append(list(row)) #appends one row as one list into a bigger list (map[])
+    #     return map
 
     #LOAD TILES INTO THE CSV INDEX
-    def load_tiles(self, mapname):
+    def load_tiles(self, map_data):
         tiles = []
         rects_list = []
-        map = self.read_csv(mapname)
         y= 0
-        for row in map:
+        for row in map_data:
             x=0
             for tile in row:
-                tile_id = tile
+                tile_id = str(tile)
                 #AVOID -1 
                 if tile_id != '-1':
                     map_x = x*self.tile_size

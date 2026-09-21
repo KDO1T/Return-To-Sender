@@ -2,7 +2,9 @@ import pygame, sys
 from pygame.locals import *
 from spritesheet import Spritesheet
 from tilemap import *
-import config
+from perlin_noise import PerlinNoise
+from player import Player, Player_Sprite
+import random
 pygame.init()
 
 #grab resolution for the users monitor
@@ -22,60 +24,224 @@ camera_speed=5 #will make this the difference in current player coordinates
 #base window status
 status = RESIZABLE
 
-clock = pygame.time.Clock() #assigning the clock function to a variable to use for the fps in the gameloop
-
 #1. initiliaze pygame, 2. names the window, 3. sets the window size and sets its paramaters
-pygame.init()
 pygame.display.set_caption("Return To Sender") 
 canvas = pygame.Surface((base_res_x, base_res_y))
 screen = pygame.display.set_mode((screen_state_w, screen_state_h), status)
 
+
+clock = pygame.time.Clock() #assigning the clock function to a variable to use for the fps in the gameloop
+
 # *-- MAP STUFF --*
 sprites = Spritesheet('spritesheet.png')
-map_grid = [['screenR1C1.csv', 'screenR1C2.csv','screenR1C3.csv'],
-            ['screenR2C1.csv','screenR2C2.csv','screenR2C3.csv']] #passes the csv file and the png file into the map variable
 
-maps = [[TileMap(file,sprites) for file in row] for row in map_grid]            #puts all row files in map_grid into a list, and putting all maps from the list into maps
+tile_size = 32
+#16 tiles / chunk
+chunk_tiles_x = 16
+chunk_tiles_y = 16
 
-#combine both map (top and bottom)
-total_map_w = sum(tile_maps.map_w  for tile_maps in maps[0])   #loops through maps list
-total_map_h = sum(row[0].map_h for row in maps)
+chunk_pixel_w = chunk_tiles_x*tile_size
+chunk_pixel_h = chunk_tiles_y*tile_size
+
+render_distance = 2
+loaded_chunks = {}
+
+#Surface_Level
+noise_1d = PerlinNoise(octaves=2, seed = 1234)
+#Caves
+noise_2d = PerlinNoise(octaves=3, seed = 1234)
 
 
-# *--PLAYER STUFF--*
-player_sprite = pygame.image.load('sprites/willie.png')
+def world_to_chunk(world_x,world_y):
+    chunk_coordinate_x, chunk_coordinate_y = int(world_x//chunk_pixel_w), int(world_y//chunk_pixel_h)
+    return chunk_coordinate_x, chunk_coordinate_y
+
+def generate_chunk_data(chunk_x, chunk_y):
+    grid = []
+    surface_scale = 0.02
+    cave_scale = 0.04
+    base_height = 7
+    amplitude = 10
+
+    for y in range(chunk_tiles_y):
+        row = []
+        world_tile_y = chunk_y*chunk_tiles_y + y
+        for x in range(chunk_tiles_x):
+            world_tile_x = chunk_x*chunk_tiles_x + x
+
+            noise_volume = noise_1d([world_tile_x*surface_scale])
+            surface_y = base_height + int(noise_volume*amplitude)
+
+            cave_volume = noise_2d([world_tile_x * cave_scale , world_tile_y * cave_scale])
+
+            depth = world_tile_y - surface_y
+
+            #spawns 0 at below tile level of 8
+            if depth < 0:
+                row.append('-1')
+            elif depth == 0:
+                if cave_volume <= -0.1:
+                    row.append('-1')
+                else:
+                    row.append('1')
+            else:
+                if depth > 20:
+                    row.append('11')
+                else:
+                    cave_threshold = -0.15 + min(0.1, depth*0.005)
+                    if cave_volume <= cave_threshold:
+                        row.append('-1')
+                    else:
+                        row.append('11')
+        grid.append(row)
+    return grid
+
+ 
+# *-----------------------------------------------------------PLAYER STUFF---------------------------------------------------------------------*
+
+player = Player(
+    Name=None,
+    HP=None,    
+    ATK=None, 
+    CRIT_DMG=None, 
+    CRIT_CHANCE=None, 
+    LEVEL=None, 
+    EXP=None, 
+    DOLLARS=None, 
+    S_COIN=None
+)
+
+
+
+
+
+
 moving_up = False
 moving_down = False
 moving_right = False
 moving_left = False
-player_rect = pygame.Rect(250, 250, player_sprite.get_width(), player_sprite.get_height()) #player hitbox
+
 player_y_momentum = 0 # <-- gravity enacted on the player
 press_space = False
-max_air_jumps = 0
+max_air_jumps = 2
 air_jumps = max_air_jumps
 on_ground = None
+x_flip = False
 
-object_rect = pygame.Rect(300, 300, 250,250)
+# *--------------------------------------------ENTITIES-------------------------------------------------------*
 
-# *--TILES OBJECTS--*
-tile_rect = []
-current_y = 0
-for row in maps:    
-    current_x = 0
-    for tile_map in row:
-        # Fetch rects offset by their section's x and y world positions
-        section_rects = tile_map.get_rects(current_x, current_y)
-        tile_rect.extend(section_rects)
+
+
+#stores the rect of the zombies
+zombies = []
+#to use later for rendering pos
+zombies_render_positions = [] #acts the same as player render pos.
+zombies_movements = [] #holds the x and y values for zombie movement
+zombie_ground_check = [] #holds boolean if zombie is in the air or not
+zombie_move_choices = []
+zombies_y_momentums = []
+zombie_y_mom = 0
+choice_count = 0 #stores the amount of frames it has been to make a new choice
+
+for i in range(10):
+    zombie = pygame.Rect(i*128, 200, 32,32)
+    zombies.append(zombie)
+
+
+
+zombie_sprite = pygame.image.load('animations/base_zombie.png')
+
+
+
+# *------------------------------ANIMATION------------------------------------------------------------------------
+
+jimmy_sheet = Spritesheet('animations/spritesheets/red_jimmy_sheet.png')
+
+jimmy_frames = []
+current_frames = []
+index = 0
+mode = 0
+count = 0
+
+# 0-5 idle, 6-10 walk, 11-14 jump, 15-17 fall
+# -idle       
+for i in range(6):
+    filename = f'idle_{i}'
+    jimmy_frames.append(jimmy_sheet.parse_sprite(filename))
+
+# -walk
+for i in range(5):
+    filename = f'walk_{i}'
+    jimmy_frames.append(jimmy_sheet.parse_sprite(filename))
+
+# -jump
+for i in range(4):
+    filename = f'jump_{i}'
+    jimmy_frames.append(jimmy_sheet.parse_sprite(filename))
+
+# -fall
+for i in range(3):
+    filename = f'fall_{i}'
+    jimmy_frames.append(jimmy_sheet.parse_sprite(filename))
+
+
+# 0-5 idle, 6-10 walk, 11-14 jump, 15-17 fall
+# 0=idle, 1=walk, 2=jump, 3=fall
+
+def update_action (mod):
+
+    if mod == 0: #idle
+        current_frames = jimmy_frames[0:5]
+
+    if mod == 1: #walk
+        current_frames = jimmy_frames[6:10]
+
+    if mod == 2: #jump
+        current_frames = jimmy_frames[11:14]
+
+    if mod == 3: #fall
+        current_frames = jimmy_frames[15:17]
+
+    return current_frames
+
+
+def update_player_frame (mod, frame, tick): #math for frame 
+    tick += 1
+
+    if tick == 60:
+        tick = 0
+
+    if mod == 0: #idling
+        frame = (tick // 10) % len(current_frames)
+
+    if mod == 1: #walking
+        frame = (tick // 12) % len(current_frames)
         
-        current_x += tile_map.map_w
-    current_y += row[0].map_h
+    if mod == 2: #jumping
+        frame = (tick // 15) % len(current_frames)
+        
+    if mod == 3: #falling
+        frame = (tick // 20) % len(current_frames)
+
+    return tick, frame
+
+
+player_rect = pygame.Rect(100, 200, 32, 32) #player hitbox
+#                                   ^^  ^^ change this number to alter player hitbox
+
 
 
 #note for rendering: whatever is first rendered in the loop will be behind while whatever is last rendered in the loop will be in the very front
 # *--GAME LOOP--*
 while True: 
 
+
+
     jump = False
+        
+
+
+
        # *--INPUT DETECTION--*
     for event in pygame.event.get(): #just detects if any 'events' occur
 
@@ -85,11 +251,11 @@ while True:
         if event.type == pygame.QUIT:
             pygame.quit()
             sys.exit()
-        elif player_rect.right>total_map_w or player_rect.top <0 or player_rect.bottom> total_map_h:
-            pygame.quit()
-            sys.exit()
-        elif player_rect.left <0:
-            player_rect.left = 1
+        # elif player_rect.right>total_map_w or player_rect.top <0 or player_rect.bottom> total_map_h:
+        #     pygame.quit()
+        #     sys.exit()
+        # elif player_rect.left <0:
+        #     player_rect.left = 1
         
         # *--KEY DETECTION--*
 
@@ -119,21 +285,13 @@ while True:
                 moving_left = True
             if event.key == pygame.K_SPACE:
                 press_space = True
-                # #positive y momentum is downward | negative y momentum is upward
-                # if on_ground is True: #player touching ground
-                #     jump = True
-                #     air_jumps = max_air_jumps
-                # else: #player is in the air
-                #     if air_jumps > 0: #if player has an extra jump, then jump then deduct from remaining jumps
-                #         jump = True
-                #         air_jumps -= 1
-                #     else:
-                #         pass
-             
 
 
             # *--KEY IS LET GO--*  
         if event.type == pygame.KEYUP:
+
+            if event.key == pygame.K_a and event.key == pygame.K_d and event.key == pygame.K_SPACE: #nothing is being touched
+                mode = 0  
             if event.key == pygame.K_w:#let go of W (up)
                 moving_up = False
             if event.key == pygame.K_s:#let go of S (down)
@@ -143,8 +301,31 @@ while True:
             if event.key == pygame.K_a: #let go of A (left)
                 moving_left = False
 
+    #chunk manager
+    position_chunk_x , position_chunk_y = world_to_chunk(player_rect.centerx, player_rect.centery)
+    needed_chunks = set()
 
-    # *--HORIZONTAL MOVEMENT + COLLISIONS--*
+    for chunk_y in range(position_chunk_y - render_distance, position_chunk_y + render_distance + 1):
+        for chunk_x in range (position_chunk_x - render_distance, position_chunk_x + render_distance + 1):
+            chunk_key = (chunk_x, chunk_y)
+            needed_chunks.add(chunk_key)
+
+            if chunk_key not in loaded_chunks:
+                raw_data = generate_chunk_data(chunk_x,chunk_y)
+                loaded_chunks[chunk_key] = TileMap(raw_data,sprites, tile_size)
+
+    for chunk_key in list(loaded_chunks.keys()):
+        if chunk_key not in needed_chunks:
+            del loaded_chunks[chunk_key]
+
+    tile_rect = []
+    for (chunk_x,chunk_y), tile_map in loaded_chunks.items():
+        chunk_world_x = chunk_x * chunk_pixel_w
+        chunk_world_y = chunk_y * chunk_pixel_h
+        tile_rect.extend(tile_map.get_rects(chunk_world_x,chunk_world_y))
+    # *---------------------------------------------------------------------------
+
+    # *--PLAYER HORIZONTAL MOVEMENT + COLLISIONS--*
 
     player_movement = [0,0]  
 
@@ -157,15 +338,6 @@ while True:
         player_movement[0]= -4
         player_rect.x += player_movement[0]
 
-    #REMOVE LATER
-    if moving_down == True:
-        player_movement[1]= 4
-        player_rect.y += player_movement[1]
-
-    if moving_up == True:
-        player_movement[1]= -4
-        player_rect.y += player_movement[1]
-
     #collisions
     for tile in tile_rect:    
         if player_rect.colliderect(tile):
@@ -177,8 +349,9 @@ while True:
 
 #---------------------------------------------------------------------
 
-    # *-- VERTICAL MOVEMENT + VERTICAL COLLISIONS --*
+    # *-- PLAYER VERTICAL MOVEMENT + VERTICAL COLLISIONS --*
     
+    #PLAYER
     #gravity
     player_movement[1] = player_y_momentum
     
@@ -227,11 +400,121 @@ while True:
     press_space = False #just returns it back to the original state so it doesn't infintely jump
 
     if jump == True:
-                player_y_momentum = -4.5
-                     
-                                         # *--RENDERING--*
- #------------------------------------
+        player_y_momentum = -4.5
 
+# *---------------------------------------ENTITIES---------------------------------------------------------
+
+
+    
+
+    # 60*x frames to tell the game to change what action the zombies should be doing
+    choice_count += 1
+    if choice_count >= 120: #120 means every 2 seconds since 60x2=120
+        choice_count = 0
+        change_action = True
+    else:
+        change_action = False
+
+    #IF 
+    if change_action == True:
+        zombie_move_choices = []
+        for i in range(len(zombies)):
+            #determining left and right movement
+                action_pool = ['Left', 'Right', 'Still']
+                action_weightage = [15,15,70]
+                zombie_action = random.choices(action_pool, weights=action_weightage, k=1)[0]
+                zombie_move_choices.append(zombie_action)
+                
+
+    #ZOMBIE MOVEMENT
+    zombies_movements = []
+    for i in range(len(zombies)):
+        zombie_move = [0,0]
+
+        
+        if len(zombie_move_choices) != 0:
+            #move right
+            if zombie_move_choices[i] == 'Right':
+                zombie_move[0] = 2
+                zombies[i].x += zombie_move[0]
+
+            #move left
+            if zombie_move_choices[i] == 'Left':
+                zombie_move[0]= -2
+                zombies[i].x += zombie_move[0]
+
+            #dont move
+            if zombie_move_choices[i] == 'Still':
+                pass
+
+        else: 
+            pass
+        
+        zombies_movements.append(zombie_move)
+
+    
+
+    #ZOMBIE HORIZONTAL MOVEMENT
+    for tile in tile_rect:    
+        for i in range(len(zombies)):
+            if zombies[i].colliderect(tile):
+                if zombies_movements[i][0] > 0:
+                    zombies[i].right = tile.left
+
+                if zombies_movements[i][0] < 0:
+                    zombies[i].left = tile.right
+            
+    #ZOMBIE VERTICAL MOVEMENT AND GRAVITY + VERTICAL COLLISION
+
+    zombies_y_momentums = []
+    for i in range(len(zombies)):
+        zombies_movements[i][1] = zombie_y_mom
+        zombie_y_mom += 0.2
+        if zombie_y_mom > 4.5:
+            zombie_y_mom = 4.5
+        
+        zombies_y_momentums.append(zombie_y_mom)
+
+        if zombies_y_momentums[i] >= 0 and zombies_y_momentums[i] <= 1: #checks if zombie is in the air
+            pass
+        else:
+            zombie_on_ground = False
+
+        zombies[i].y += zombies_movements[i][1]
+
+        for tile in tile_rect:
+            if zombies[i].colliderect(tile):
+                if zombies_movements[i][1] > 0:
+                    zombies[i].bottom = tile.top
+                    zombies_y_momentums[i] = 0 # <-- basically tells the game that i can stop falling now
+                    zombie_on_ground = True
+            
+                if zombies_movements[i][1] < 0:
+                    zombies[i].top = tile.bottom
+                    zombies_y_momentums[i] = 0 # <-- same with this
+
+
+                                # *--ANIMATION--*
+ #-----------------------------------------------------------------------------------------------------
+    #chooses what type of action the player is doing to then determine animation playing
+
+    if on_ground == False and player_y_momentum > 0: #falling animation
+        mode = 3
+    elif on_ground == False and player_y_momentum <= 0: #jumping animation
+        mode = 2
+    elif moving_right or moving_left:
+        mode = 1
+    else: #idle
+        mode = 0
+
+
+                                # *--RENDERING--*
+ #----------------------------------------------------------------------------------------------------------
+
+    # void
+    if player_rect.y > 2000:
+        player_rect.x, player_rect.y = 250,100
+        player_y_momentum = 0
 
 
     # *--CAMERA MOVEMENT--*
@@ -240,51 +523,72 @@ while True:
     camera_y = player_rect.centery - (base_res_y // 2)
 
      #map clamping      
-    max_cam_x = total_map_w - base_res_x
-    max_cam_y = total_map_h - base_res_y
+    # max_cam_x = total_map_w - base_res_x
+    # max_cam_y = total_map_h - base_res_y
 
-    camera_x = max(0, min(camera_x, max_cam_x))
-    camera_y = max(0, min(camera_y, max_cam_y))
-
-
+    # camera_x = max(0, min(camera_x, max_cam_x))
+    # camera_y = max(0, min(camera_y, max_cam_y))
 
 
 
     canvas.fill((159, 215, 255))    #nice sky background
-    current_y= 0
+    # current_y= 0
 
-    #filtering through the top and bottom layer in maps
-    for row in maps:            
-        current_x = 0
-        #filtering through each screen in each layer
-        for tile_map in row:
-            #drawing the map with respect to each offset
-            tile_map.draw_map(canvas, camera_x, camera_y, offset_x = current_x, offset_y = current_y)
-            #updating x offset
-            current_x += tile_map.map_w
-        #updating y offset
-        current_y += row[0].map_h
+    # #filtering through the top and bottom layer in maps
+    # for row in maps:            
+    #     current_x = 0
+    #     #filtering through each screen in each layer
+    #     for tile_map in row:
+    #         #drawing the map with respect to each offset
+    #         tile_map.draw_map(canvas, camera_x, camera_y, offset_x = current_x, offset_y = current_y)
+    #         #updating x offset
+    #         current_x += tile_map.map_w
+    #     #updating y offset
+    #     current_y += row[0].map_h
+
+    for (chunk_x,chunk_y), tile_map in loaded_chunks.items():
+        chunk_world_x = chunk_x *chunk_pixel_w
+        chunk_world_y = chunk_y * chunk_pixel_h
+        tile_map.draw_map(canvas, camera_x, camera_y,offset_x=chunk_world_x,offset_y=chunk_world_y)
 
     player_render_pos = (player_rect.x - camera_x, player_rect.y - camera_y) #centers player on screen
-    canvas.blit(player_sprite, player_render_pos) #draws the player onto the location of its hitbox*
 
+
+
+    zombies_render_positions = []
+    for i in range(len(zombies)):
+        zombie_render_pos = (zombies[i].x - camera_x, zombies[i].y - camera_y)
+        zombies_render_positions.append(zombie_render_pos)
+
+    #flipping code
+    
+    if moving_left == True:
+        x_flip = True
+    elif moving_right == True:
+        x_flip = False
+    else:
+         pass
+
+ 
+    current_frames = update_action(mode) #determines the current type of animation playing
+    count, index = update_player_frame(mode, index, count) #update frame played
+    player_sprite = current_frames[index] #determines the image/sprite which will be displayed on player pos
+    canvas.blit(pygame.transform.flip(player_sprite, x_flip, False), player_render_pos) 
+
+    for i in range(len(zombies)):
+        canvas.blit(zombie_sprite, (zombies_render_positions[i]))
+
+     
+
+    #^^ draws the player onto the location of its hitbox*
+    # x_flip tells the game whether it should flip the direction of the sprite on the x axis or not.
+    # all sprites are all originally drawn to the right side.
 
 
     #scale the screen
     scaled_resolution = pygame.transform.scale(canvas, (screen_state_w, screen_state_h))
 
-
     screen.blit(scaled_resolution,(0,0))   #creates a window to be displayed
-    
-    # Apply brightness overlay
-    if config.brightness < 100:
-        # Calculate alpha: 255 when brightness=0, 0 when brightness=100
-        alpha = int(255 * (1 - config.brightness / 100))
-        brightness_overlay = pygame.Surface((screen_state_w, screen_state_h))
-        brightness_overlay.set_alpha(alpha)
-        brightness_overlay.fill((0, 0, 0))
-        screen.blit(brightness_overlay, (0, 0))
-
 
     pygame.display.update() #updates the screen
     clock.tick(60) #ensures framerate is consistently 60fps
