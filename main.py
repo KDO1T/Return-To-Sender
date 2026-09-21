@@ -2,6 +2,7 @@ import pygame, sys
 from pygame.locals import *
 from spritesheet import Spritesheet
 from tilemap import *
+from perlin_noise import PerlinNoise
 pygame.init()
 
 #grab resolution for the users monitor
@@ -43,6 +44,11 @@ chunk_pixel_h = chunk_tiles_y*tile_size
 render_distance = 2
 loaded_chunks = {}
 
+#Surface_Level
+noise_1d = PerlinNoise(octaves=2, seed = 1234)
+#Caves
+noise_2d = PerlinNoise(octaves=3, seed = 1234)
+
 
 def world_to_chunk(world_x,world_y):
     chunk_coordinate_x, chunk_coordinate_y = int(world_x//chunk_pixel_w), int(world_y//chunk_pixel_h)
@@ -50,20 +56,46 @@ def world_to_chunk(world_x,world_y):
 
 def generate_chunk_data(chunk_x, chunk_y):
     grid = []
+    surface_scale = 0.02
+    cave_scale = 0.04
+    base_height = 7
+    amplitude = 10
+
     for y in range(chunk_tiles_y):
         row = []
         world_tile_y = chunk_y*chunk_tiles_y + y
         for x in range(chunk_tiles_x):
+            world_tile_x = chunk_x*chunk_tiles_x + x
+
+            noise_volume = noise_1d([world_tile_x*surface_scale])
+            surface_y = base_height + int(noise_volume*amplitude)
+
+            cave_volume = noise_2d([world_tile_x * cave_scale , world_tile_y * cave_scale])
+
+            depth = world_tile_y - surface_y
+
             #spawns 0 at below tile level of 8
-            if world_tile_y >= 8:
-                row.append('0')
-            else:
+            if depth < 0:
                 row.append('-1')
+            elif depth == 0:
+                if cave_volume <= -0.1:
+                    row.append('-1')
+                else:
+                    row.append('1')
+            else:
+                if depth > 20:
+                    row.append('11')
+                else:
+                    cave_threshold = -0.15 + min(0.1, depth*0.005)
+                    if cave_volume <= cave_threshold:
+                        row.append('-1')
+                    else:
+                        row.append('11')
         grid.append(row)
     return grid
 
 # *--PLAYER STUFF--*
-player_sprite = pygame.image.load('sprites/ajimmus.png')
+player_sprite = pygame.image.load('sprites/junny.png')
 moving_up = False
 moving_down = False
 moving_right = False
