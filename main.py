@@ -1,10 +1,21 @@
-import pygame, sys
+import random
+import sys
+
+import pygame
+from perlin_noise import PerlinNoise
 from pygame.locals import *
+
+import config
+from player import Player, Player_Sprite
 from spritesheet import Spritesheet
 from tilemap import *
-from perlin_noise import PerlinNoise
-from player import Player, Player_Sprite
-import random
+
+# Parse command-line arguments
+brightness = 0
+if "--brightness" in sys.argv:
+    brightness = int(sys.argv[sys.argv.index("--brightness") + 1])
+    brightness = max(0, min(100, brightness))
+
 pygame.init()
 
 #grab resolution for the users monitor
@@ -47,9 +58,9 @@ render_distance = 2
 loaded_chunks = {}
 
 #Surface_Level
-noise_1d = PerlinNoise(octaves=2, seed = 1234)
+noise_1d = PerlinNoise(octaves=2, seed = 8888)
 #Caves
-noise_2d = PerlinNoise(octaves=3, seed = 1234)
+noise_2d = PerlinNoise(octaves=3, seed = 8888)
 
 
 def world_to_chunk(world_x,world_y):
@@ -307,7 +318,7 @@ while True:
 
     for chunk_y in range(position_chunk_y - render_distance, position_chunk_y + render_distance + 1):
         for chunk_x in range (position_chunk_x - render_distance, position_chunk_x + render_distance + 1):
-            chunk_key = (chunk_x, chunk_y)
+            chunk_key = (chunk_x,chunk_y)
             needed_chunks.add(chunk_key)
 
             if chunk_key not in loaded_chunks:
@@ -402,7 +413,7 @@ while True:
     if jump == True:
         player_y_momentum = -4.5
 
-# *---------------------------------------ENTITIES---------------------------------------------------------
+# *---------------------------------------ENTITIES---------------------------------------------------------*
 
 
     
@@ -537,7 +548,7 @@ while True:
     # #filtering through the top and bottom layer in maps
     # for row in maps:            
     #     current_x = 0
-    #     #filtering through each screen in each layer
+    #     #filtering through each screen in each row
     #     for tile_map in row:
     #         #drawing the map with respect to each offset
     #         tile_map.draw_map(canvas, camera_x, camera_y, offset_x = current_x, offset_y = current_y)
@@ -547,7 +558,7 @@ while True:
     #     current_y += row[0].map_h
 
     for (chunk_x,chunk_y), tile_map in loaded_chunks.items():
-        chunk_world_x = chunk_x *chunk_pixel_w
+        chunk_world_x = chunk_x * chunk_pixel_w
         chunk_world_y = chunk_y * chunk_pixel_h
         tile_map.draw_map(canvas, camera_x, camera_y,offset_x=chunk_world_x,offset_y=chunk_world_y)
 
@@ -584,6 +595,18 @@ while True:
     # x_flip tells the game whether it should flip the direction of the sprite on the x axis or not.
     # all sprites are all originally drawn to the right side.
 
+    # Brightness
+    brightness_overlay = pygame.Surface((base_res_x, base_res_y))
+    brightness_overlay.fill((0, 0, 0))
+
+    brightness_alpha = int((100 - brightness) / 100 * 255)
+    brightness_overlay.set_alpha(brightness_alpha)
+
+    canvas.blit(brightness_overlay, (0, 0))
+
+    #scale the screen
+    scaled_resolution = pygame.transform.scale(canvas, (screen_state_w, screen_state_h))
+
 
     #scale the screen
     scaled_resolution = pygame.transform.scale(canvas, (screen_state_w, screen_state_h))
@@ -592,4 +615,3 @@ while True:
 
     pygame.display.update() #updates the screen
     clock.tick(60) #ensures framerate is consistently 60fps
-

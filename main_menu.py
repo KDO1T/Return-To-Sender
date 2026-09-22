@@ -1,8 +1,10 @@
-import os
 import json
-from sys import exit
+import os
+import subprocess
+from sys import executable, exit
 
 import pygame
+
 import config
 
 pygame.init()
@@ -22,19 +24,11 @@ def save_exists(slot_name):
 
 def create_save_file(slot_name, slot_index):
     with open(save_file_path(slot_name), "w") as save_file:
-        json.dump(
-            {
-                "name": slot_name,
-                "slot_index": slot_index
-            },
-            save_file,
-            indent=4
-        )
+        json.dump({"name": slot_name, "slot_index": slot_index}, save_file, indent=4)
 
 
 def delete_save_file(slot_name):
     save_path = save_file_path(slot_name)
-
     if os.path.exists(save_path):
         os.remove(save_path)
 
@@ -42,18 +36,11 @@ def delete_save_file(slot_name):
 def rename_save_file(old_name, new_name):
     old_path = save_file_path(old_name)
     new_path = save_file_path(new_name)
-
     if os.path.exists(old_path):
-
-        try:
-            with open(old_path, "r") as save_file:
-                save_data = json.load(save_file)
-
-        except (OSError, json.JSONDecodeError):
-            save_data = {}
+        with open(old_path, "r") as save_file:
+            save_data = json.load(save_file)
 
         save_data["name"] = new_name
-
         os.rename(old_path, new_path)
 
         with open(new_path, "w") as save_file:
@@ -62,29 +49,21 @@ def rename_save_file(old_name, new_name):
 
 def delete_save_slot(slot_index):
     """Delete a save slot: remove JSON file if it exists, mark slot as Empty."""
-
     slot_name = save_slots[slot_index]["name"]
-
     if save_exists(slot_name):
         delete_save_file(slot_name)
-
     save_slots[slot_index]["name"] = f"Save {slot_index + 1}"
     save_slots[slot_index]["exists"] = False
     save_slots[slot_index]["last_saved"] = None
 
 
 def sync_save_slots_with_files():
-    """Sync save slots with existing JSON files on startup."""
-
-    # Reset all slots to their default state first
+    """Sync save_slots with existing JSON files on startup."""
     for index, slot in enumerate(save_slots):
         slot["name"] = f"Save {index + 1}"
         slot["exists"] = False
-        slot["last_saved"] = None
 
-    # Check every save file in the saves folder
     for filename in os.listdir(saves_dir):
-
         if not filename.endswith(".json"):
             continue
 
@@ -93,40 +72,23 @@ def sync_save_slots_with_files():
         try:
             with open(save_path, "r") as save_file:
                 save_data = json.load(save_file)
-
         except (OSError, json.JSONDecodeError):
             continue
 
         slot_index = save_data.get("slot_index")
 
-        # Support older Save 1/2/3 files that were created
-        # before slot_index was added.
         if not isinstance(slot_index, int) or isinstance(slot_index, bool):
+            save_name = os.path.splitext(filename)[0]
 
-            filename_without_extension = os.path.splitext(filename)[0]
-
-            for index in range(len(save_slots)):
-
-                if filename_without_extension == f"Save {index + 1}":
-                    slot_index = index
-                    break
-
+            if save_name.startswith("Save ") and save_name[-1:].isdigit():
+                slot_index = int(save_name[-1:]) - 1
             else:
-                # Old renamed saves have no way to tell us
-                # which slot they originally belonged to.
                 continue
 
-        # Ignore invalid slot indexes
         if not 0 <= slot_index < len(save_slots):
             continue
 
-        # The filename represents the current save name.
-        slot_name = os.path.splitext(filename)[0]
-
-        if slot_name == "":
-            continue
-
-        save_slots[slot_index]["name"] = slot_name
+        save_slots[slot_index]["name"] = os.path.splitext(filename)[0]
         save_slots[slot_index]["exists"] = True
 
 
@@ -174,7 +136,7 @@ rect_text = text.get_rect()
 
 rect_text.center = (
     base_res_x / 2,
-    base_res_y / 4
+    base_res_y /4
 )
 
 
@@ -198,7 +160,6 @@ save_card_positions = [
 
 main_menu = ["Play", "Options", "Quit"]
 
-
 save_slots = [
     {
         "name": "Save 1",
@@ -217,10 +178,8 @@ save_slots = [
     }
 ]
 
-
 # Sync save slots with existing JSON files on startup
 sync_save_slots_with_files()
-
 
 selected_save = None
 renaming_save = False
@@ -235,13 +194,11 @@ current_state = "MAIN"
 # Options menu state
 selected_option = None
 dropdown_open = False
-
 resolution_options = [
     (640, 360),
     (1280, 720),
     (1920, 1080)
 ]
-
 selected_resolution = 1
 fullscreen = False
 
@@ -250,9 +207,27 @@ master_volume = 100
 music_volume = 80
 sfx_volume = 100
 
+# Brightness value (0 - 100)
+brightness = 0
+
 # Drag state for sliders
 drag = False
 dragging_slider = None
+
+
+def open_save(slot_index):
+    slot_name = save_slots[slot_index]["name"]
+
+    if not save_exists(slot_name):
+        create_save_file(slot_name, slot_index)
+        save_slots[slot_index]["exists"] = True
+
+    subprocess.Popen(
+        [executable, "main.py", "--save-slot", str(slot_index), "--brightness", str(brightness)]
+    )
+
+    pygame.quit()
+    exit()
 
 
 def save_rename():
@@ -281,10 +256,8 @@ def save_rename():
 
     # Indicator for the save slot "Exists" or "None"
     save_slots[selected_save]["name"] = new_name
-
     # Syncs "exists" indicator with file existence after rename
     save_slots[selected_save]["exists"] = save_exists(new_name)
-
     message = ""
 
     return True
@@ -327,7 +300,6 @@ while True:
                 )
 
             canvas.blit(option_text, option_rect)
-
 
     # PLAY MENU
     elif current_state == "PLAY":
@@ -468,7 +440,6 @@ while True:
             base_res_x / 2,
             310
         )
-
         # change the mouse position with the 1280 x 720 resolution so user isn't clicking at a 640 x 360 coordinates
         mouse_x = pygame.mouse.get_pos()[0] * base_res_x / screen_state_w
         mouse_y = pygame.mouse.get_pos()[1] * base_res_y / screen_state_h
@@ -483,7 +454,6 @@ while True:
 
         canvas.blit(back_text, back_rect)
 
-
     # OPTIONS Menu
     elif current_state == "OPTIONS":
 
@@ -492,11 +462,7 @@ while True:
             False,
             (240, 240, 240)
         )
-
-        options_title_rect = options_title.get_rect(
-            center=(base_res_x / 2, 35)
-        )
-
+        options_title_rect = options_title.get_rect(center=(base_res_x / 2, 35))
         canvas.blit(options_title, options_title_rect)
 
         options_subtitle = font_section.render(
@@ -504,11 +470,7 @@ while True:
             False,
             (140, 140, 140)
         )
-
-        options_subtitle_rect = options_subtitle.get_rect(
-            center=(base_res_x / 2, 68)
-        )
-
+        options_subtitle_rect = options_subtitle.get_rect(center=(base_res_x / 2, 68))
         canvas.blit(options_subtitle, options_subtitle_rect)
 
         # Menu cards
@@ -539,11 +501,9 @@ while True:
                 False,
                 (240, 240, 240)
             )
-
             card_text_rect = card_text.get_rect(
                 midleft=(card_rect.left + 20, card_rect.centery)
             )
-
             canvas.blit(card_text, card_text_rect)
 
             arrow_text = font_section.render(
@@ -551,13 +511,10 @@ while True:
                 False,
                 (235, 65, 40)
             )
-
             arrow_rect = arrow_text.get_rect(
                 midright=(card_rect.right - 20, card_rect.centery)
             )
-
             canvas.blit(arrow_text, arrow_rect)
-
 
         # Back button
         back_text = font_section.render(
@@ -565,7 +522,6 @@ while True:
             False,
             (240, 240, 240)
         )
-
         back_rect = back_text.get_rect(
             center=(base_res_x / 2, 330)
         )
@@ -574,7 +530,6 @@ while True:
         mouse_y = pygame.mouse.get_pos()[1] * base_res_y / screen_state_h
 
         if back_rect.collidepoint(mouse_x, mouse_y):
-
             back_text = font_section.render(
                 "Back",
                 False,
@@ -592,11 +547,7 @@ while True:
             False,
             (240, 240, 240)
         )
-
-        video_title_rect = video_title.get_rect(
-            center=(base_res_x / 2, 35)
-        )
-
+        video_title_rect = video_title.get_rect(center=(base_res_x / 2, 35))
         canvas.blit(video_title, video_title_rect)
 
         video_subtitle = font_section.render(
@@ -604,19 +555,12 @@ while True:
             False,
             (140, 140, 140)
         )
-
         video_subtitle_rect = video_subtitle.get_rect(
             center=(base_res_x / 2, 68)
         )
-
         canvas.blit(video_subtitle, video_subtitle_rect)
 
-        panel_rect = pygame.Rect(
-            80,
-            95,
-            480,
-            190
-        )
+        panel_rect = pygame.Rect(80, 95, 480, 190)
 
         pygame.draw.rect(
             canvas,
@@ -625,18 +569,15 @@ while True:
             2
         )
 
-
         # Resolution
         res_label = font_section.render(
             "Resolution:",
             False,
             (240, 240, 240)
         )
-
         res_label_rect = res_label.get_rect(
             midleft=(panel_rect.left + 25, 130)
         )
-
         canvas.blit(res_label, res_label_rect)
 
         res_text = font_section.render(
@@ -644,11 +585,9 @@ while True:
             False,
             (235, 65, 40)
         )
-
         res_text_rect = res_text.get_rect(
             midright=(panel_rect.right - 55, 130)
         )
-
         canvas.blit(res_text, res_text_rect)
 
         arrow_text = font_section.render(
@@ -656,13 +595,10 @@ while True:
             False,
             (235, 65, 40)
         )
-
         arrow_rect = arrow_text.get_rect(
             midright=(panel_rect.right - 20, 130)
         )
-
         canvas.blit(arrow_text, arrow_rect)
-
 
         # Fullscreen
         fullscreen_text = font_section.render(
@@ -670,11 +606,9 @@ while True:
             False,
             (240, 240, 240)
         )
-
         fullscreen_text_rect = fullscreen_text.get_rect(
             midleft=(panel_rect.left + 25, 175)
         )
-
         canvas.blit(fullscreen_text, fullscreen_text_rect)
 
         fullscreen_value = font_section.render(
@@ -682,13 +616,10 @@ while True:
             False,
             (235, 65, 40)
         )
-
         fullscreen_value_rect = fullscreen_value.get_rect(
             midright=(panel_rect.right - 55, 175)
         )
-
         canvas.blit(fullscreen_value, fullscreen_value_rect)
-
 
         # Brightness
         bright_label = font_section.render(
@@ -696,11 +627,9 @@ while True:
             False,
             (240, 240, 240)
         )
-
         bright_label_rect = bright_label.get_rect(
             midleft=(panel_rect.left + 25, 250)
         )
-
         canvas.blit(bright_label, bright_label_rect)
 
         slider_x = 270
@@ -714,7 +643,7 @@ while True:
             2
         )
 
-        handle_x = slider_x + (config.brightness / 100 * slider_width)
+        handle_x = slider_x + (brightness / 100 * slider_width)
 
         pygame.draw.rect(
             canvas,
@@ -722,14 +651,12 @@ while True:
             (handle_x - 4, slider_y - 5, 8, 24)
         )
 
-
         # Back button
         back_text = font_section.render(
             "Back",
             False,
             (240, 240, 240)
         )
-
         back_rect = back_text.get_rect(
             center=(base_res_x / 2, 330)
         )
@@ -738,13 +665,11 @@ while True:
         mouse_y = pygame.mouse.get_pos()[1] * base_res_y / screen_state_h
 
         if back_rect.collidepoint(mouse_x, mouse_y):
-
             back_text = font_section.render(
                 "Back",
                 False,
                 (235, 65, 40)
             )
-
 
         # Resolution dropdown
         if dropdown_open:
@@ -780,16 +705,12 @@ while True:
                 )
 
                 option_rect = option_text.get_rect(
-                    midleft=(
-                        dropdown_rect.left + 12,
-                        160 + (index * 30)
-                    )
+                    midleft=(dropdown_rect.left + 12, 160 + (index * 30))
                 )
 
                 canvas.blit(option_text, option_rect)
 
         canvas.blit(back_text, back_rect)
-
 
     # CONTROLS sub-screen
     elif current_state == "CONTROLS":
@@ -799,11 +720,9 @@ while True:
             False,
             (240, 240, 240)
         )
-
         controls_title_rect = controls_title.get_rect(
             center=(base_res_x / 2, 35)
         )
-
         canvas.blit(controls_title, controls_title_rect)
 
         controls_subtitle = font_section.render(
@@ -811,19 +730,12 @@ while True:
             False,
             (140, 140, 140)
         )
-
         controls_subtitle_rect = controls_subtitle.get_rect(
             center=(base_res_x / 2, 68)
         )
-
         canvas.blit(controls_subtitle, controls_subtitle_rect)
 
-        panel_rect = pygame.Rect(
-            80,
-            95,
-            480,
-            185
-        )
+        panel_rect = pygame.Rect(80, 95, 480, 185)
 
         pygame.draw.rect(
             canvas,
@@ -849,11 +761,9 @@ while True:
                 False,
                 (240, 240, 240)
             )
-
             action_rect = action_text.get_rect(
                 midleft=(panel_rect.left + 25, row_y)
             )
-
             canvas.blit(action_text, action_rect)
 
             key_text = font_section.render(
@@ -861,13 +771,10 @@ while True:
                 False,
                 (235, 65, 40)
             )
-
             key_rect = key_text.get_rect(
                 midright=(panel_rect.right - 25, row_y)
             )
-
             canvas.blit(key_text, key_rect)
-
 
         # Back button
         back_text = font_section.render(
@@ -875,7 +782,6 @@ while True:
             False,
             (240, 240, 240)
         )
-
         back_rect = back_text.get_rect(
             center=(base_res_x / 2, 330)
         )
@@ -884,7 +790,6 @@ while True:
         mouse_y = pygame.mouse.get_pos()[1] * base_res_y / screen_state_h
 
         if back_rect.collidepoint(mouse_x, mouse_y):
-
             back_text = font_section.render(
                 "Back",
                 False,
@@ -902,11 +807,9 @@ while True:
             False,
             (240, 240, 240)
         )
-
         audio_title_rect = audio_title.get_rect(
             center=(base_res_x / 2, 35)
         )
-
         canvas.blit(audio_title, audio_title_rect)
 
         audio_subtitle = font_section.render(
@@ -914,19 +817,12 @@ while True:
             False,
             (140, 140, 140)
         )
-
         audio_subtitle_rect = audio_subtitle.get_rect(
             center=(base_res_x / 2, 68)
         )
-
         canvas.blit(audio_subtitle, audio_subtitle_rect)
 
-        panel_rect = pygame.Rect(
-            60,
-            95,
-            520,
-            190
-        )
+        panel_rect = pygame.Rect(60, 95, 520, 190)
 
         pygame.draw.rect(
             canvas,
@@ -953,11 +849,9 @@ while True:
                 False,
                 (240, 240, 240)
             )
-
             label_rect = label_text.get_rect(
                 midleft=(panel_rect.left + 20, row_y)
             )
-
             canvas.blit(label_text, label_rect)
 
             slider_y = row_y - 7
@@ -982,13 +876,10 @@ while True:
                 False,
                 (140, 140, 140)
             )
-
             value_rect = value_text.get_rect(
                 midleft=(slider_x + slider_width + 12, row_y)
             )
-
             canvas.blit(value_text, value_rect)
-
 
         # Back button
         back_text = font_section.render(
@@ -996,7 +887,6 @@ while True:
             False,
             (240, 240, 240)
         )
-
         back_rect = back_text.get_rect(
             center=(base_res_x / 2, 330)
         )
@@ -1005,7 +895,6 @@ while True:
         mouse_y = pygame.mouse.get_pos()[1] * base_res_y / screen_state_h
 
         if back_rect.collidepoint(mouse_x, mouse_y):
-
             back_text = font_section.render(
                 "Back",
                 False,
@@ -1013,7 +902,6 @@ while True:
             )
 
         canvas.blit(back_text, back_rect)
-
 
     # input
     for event in pygame.event.get():
@@ -1209,19 +1097,7 @@ while True:
 
                                 else:
 
-                                    if not save_exists(save_slots[index]["name"]):
-
-                                        create_save_file(
-                                            save_slots[index]["name"],
-                                            index
-                                        )
-
-                                        save_slots[index]["exists"] = True
-
-                                    print(
-                                        "OPEN SAVE:",
-                                        save_slots[index]["name"]
-                                    )
+                                    open_save(index)
 
 
                             # clicked another save
@@ -1267,11 +1143,9 @@ while True:
                     )
 
                     if back_rect.collidepoint(mouse_pos):
-
                         current_state = "MAIN"
                         selected_option = None
                         dropdown_open = False
-
 
                     # Handle menu cards
                     option_cards = [
@@ -1292,17 +1166,14 @@ while True:
                         if card_rect.collidepoint(mouse_pos):
 
                             if option == "Audio Settings":
-
                                 current_state = "AUDIO"
                                 dropdown_open = False
 
                             elif option == "Video Settings":
-
                                 current_state = "VIDEO"
                                 dropdown_open = False
 
                             elif option == "Controls":
-
                                 current_state = "CONTROLS"
                                 dropdown_open = False
 
@@ -1318,10 +1189,8 @@ while True:
                     )
 
                     if back_rect.collidepoint(mouse_pos):
-
                         current_state = "OPTIONS"
                         dropdown_open = False
-
 
                     # Resolution selector
                     resolution_rect = pygame.Rect(
@@ -1332,9 +1201,7 @@ while True:
                     )
 
                     if resolution_rect.collidepoint(mouse_pos):
-
                         dropdown_open = not dropdown_open
-
 
                     # Resolution dropdown choices
                     elif dropdown_open:
@@ -1349,30 +1216,27 @@ while True:
                             )
 
                             if dropdown_rect.collidepoint(mouse_pos):
-
                                 selected_resolution = index
                                 dropdown_open = False
-
+                                
                                 # Get the selected (width, height) from resolution_options using selected_resolution
                                 selected_width, selected_height = resolution_options[selected_resolution]
-
+                                
                                 # Set the existing window_w and window_h variables to that width and height
                                 window_w = selected_width
                                 window_h = selected_height
-
+                                
                                 # Only update the active window when in windowed mode
                                 if status == pygame.RESIZABLE:
-
                                     screen_state_w = window_w
                                     screen_state_h = window_h
-
+                                    
                                     screen = pygame.display.set_mode(
                                         (screen_state_w, screen_state_h),
                                         status
                                     )
-
+                                
                                 break
-
 
                     # Fullscreen toggle
                     fullscreen_rect = pygame.Rect(
@@ -1387,7 +1251,6 @@ while True:
                         fullscreen = not fullscreen
 
                         if fullscreen:
-
                             status = pygame.FULLSCREEN
                             screen_state_w = display_w
                             screen_state_h = display_h
@@ -1398,7 +1261,6 @@ while True:
                             )
 
                         else:
-
                             status = pygame.RESIZABLE
                             screen_state_w = window_w
                             screen_state_h = window_h
@@ -1407,7 +1269,6 @@ while True:
                                 (screen_state_w, screen_state_h),
                                 status
                             )
-
 
                     # Brightness slider
                     brightness_slider_rect = pygame.Rect(
@@ -1418,18 +1279,12 @@ while True:
                     )
 
                     if brightness_slider_rect.collidepoint(mouse_pos):
-
                         drag = True
                         dragging_slider = "brightness"
-
-                        config.brightness = int(
+                        brightness = int(
                             (mouse_x - 270) / 220 * 100
                         )
-
-                        config.brightness = max(
-                            0,
-                            min(100, config.brightness)
-                        )
+                        brightness = max(0, min(100, brightness))
 
 
                 elif current_state == "CONTROLS":
@@ -1442,7 +1297,6 @@ while True:
                     )
 
                     if back_rect.collidepoint(mouse_pos):
-
                         current_state = "OPTIONS"
 
 
@@ -1456,9 +1310,7 @@ while True:
                     )
 
                     if back_rect.collidepoint(mouse_pos):
-
                         current_state = "OPTIONS"
-
 
                     # Audio slider hitboxes
                     audio_sliders = [
@@ -1477,33 +1329,22 @@ while True:
                         )
 
                         if slider_rect.collidepoint(mouse_pos):
-
                             drag = True
                             dragging_slider = slider_name
 
                             value = int(
                                 (mouse_x - 255) / 250 * 100
                             )
-
-                            value = max(
-                                0,
-                                min(100, value)
-                            )
+                            value = max(0, min(100, value))
 
                             if slider_name == "master":
-
                                 master_volume = value
-
                             elif slider_name == "music":
-
                                 music_volume = value
-
                             elif slider_name == "sfx":
-
                                 sfx_volume = value
 
                             break
-
 
     # Continuous slider dragging
     if drag:
@@ -1513,54 +1354,32 @@ while True:
             mouse_x = pygame.mouse.get_pos()[0] * base_res_x / screen_state_w
 
             if dragging_slider == "brightness" and current_state == "VIDEO":
-
-                config.brightness = int(
+                brightness = int(
                     (mouse_x - 270) / 220 * 100
                 )
-
-                config.brightness = max(
-                    0,
-                    min(100, config.brightness)
-                )
+                brightness = max(0, min(100, brightness))
 
             elif dragging_slider == "master" and current_state == "AUDIO":
-
                 master_volume = int(
                     (mouse_x - 255) / 250 * 100
                 )
-
-                master_volume = max(
-                    0,
-                    min(100, master_volume)
-                )
+                master_volume = max(0, min(100, master_volume))
 
             elif dragging_slider == "music" and current_state == "AUDIO":
-
                 music_volume = int(
                     (mouse_x - 255) / 250 * 100
                 )
-
-                music_volume = max(
-                    0,
-                    min(100, music_volume)
-                )
+                music_volume = max(0, min(100, music_volume))
 
             elif dragging_slider == "sfx" and current_state == "AUDIO":
-
                 sfx_volume = int(
                     (mouse_x - 255) / 250 * 100
                 )
-
-                sfx_volume = max(
-                    0,
-                    min(100, sfx_volume)
-                )
+                sfx_volume = max(0, min(100, sfx_volume))
 
         else:
-
             drag = False
             dragging_slider = None
-
 
     # scale the canvas to the current window size
     scaled_resolution = pygame.transform.scale(
