@@ -45,11 +45,12 @@ chunk_pixel_h = chunk_tiles_y*tile_size
 
 render_distance = 2
 loaded_chunks = {}
+set_seed = 1234
 
 #Surface_Level
-noise_1d = PerlinNoise(octaves=2, seed = 1234)
+noise_1d = PerlinNoise(octaves=2, seed = int(set_seed))
 #Caves
-noise_2d = PerlinNoise(octaves=3, seed = 1234)
+noise_2d = PerlinNoise(octaves=3, seed = int(set_seed))
 
 
 def world_to_chunk(world_x,world_y):
@@ -76,23 +77,33 @@ def generate_chunk_data(chunk_x, chunk_y):
 
             depth = world_tile_y - surface_y
 
-            #spawns 0 at below tile level of 8
+            #the depth determines how deep the caves should go
             if depth < 0:
                 row.append('-1')
+            #surface Layer
             elif depth == 0:
-                if cave_volume <= -0.1:
+                if cave_volume <= -0.25:
                     row.append('-1')
                 else:
                     row.append('1')
-            else:
-                if depth > 20:
-                    row.append('11')
+            elif depth <4:
+                if cave_volume <= -0.22:
+                    row.append('-1')
                 else:
-                    cave_threshold = -0.15 + min(0.1, depth*0.005)
-                    if cave_volume <= cave_threshold:
-                        row.append('-1')
-                    else:
-                        row.append('11')
+                    row.append('11')
+            #underground Caves
+            else:
+                cave_threshold = -0.01 + min(0.15, (depth-4)*0.01)
+
+                if depth >20:
+                    cave_threshold -= (depth-20)*0.02
+
+                if cave_volume <= cave_threshold:
+                    row.append('-1')
+                else:
+                    row.append('11')
+            
+                    
         grid.append(row)
     return grid
 
@@ -323,6 +334,7 @@ while True:
         chunk_world_x = chunk_x * chunk_pixel_w
         chunk_world_y = chunk_y * chunk_pixel_h
         tile_rect.extend(tile_map.get_rects(chunk_world_x,chunk_world_y))
+
     # *---------------------------------------------------------------------------
 
     # *--PLAYER HORIZONTAL MOVEMENT + COLLISIONS--*
