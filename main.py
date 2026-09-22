@@ -112,10 +112,6 @@ player = Player(
 )
 
 
-
-
-
-
 moving_up = False
 moving_down = False
 moving_right = False
@@ -127,6 +123,9 @@ max_air_jumps = 2
 air_jumps = max_air_jumps
 on_ground = None
 x_flip = False
+
+player_rect = pygame.Rect(100, 200, 32, 32) #player hitbox
+#                                   ^^  ^^ change this number to alter player hitbox
 
 # *--------------------------------------------ENTITIES-------------------------------------------------------*
 
@@ -140,12 +139,35 @@ zombies_movements = [] #holds the x and y values for zombie movement
 zombie_ground_check = [] #holds boolean if zombie is in the air or not
 zombie_move_choices = []
 zombies_y_momentums = []
+zombies_x_flips = []
 zombie_y_mom = 0
 choice_count = 0 #stores the amount of frames it has been to make a new choice
+zombie_index = 0
 
-for i in range(10):
-    zombie = pygame.Rect(i*128, 200, 32,32)
-    zombies.append(zombie)
+
+
+def check_load(player_current_chunk_x):
+
+
+    if len(zombies) != 8:
+        for i in range(8):
+            randomizer = random.randint(1,80)
+            zombie = pygame.Rect(((player_current_chunk_x + 640)+(i*randomizer)), 50, 32,32)
+            zombies.append(zombie)
+            zombies_y_momentums.append(0)
+
+
+    for i in range(len(zombies)):
+        if zombies[i].x < player_current_chunk_x:
+            zombie_index = i
+            return zombie_index
+
+    return None
+
+def despawn(zombie_list, deleted_zombie):
+    if deleted_zombie is not None:
+        zombie_list.pop(deleted_zombie)
+        zombies_y_momentums[deleted_zombie] = 0
 
 
 
@@ -226,8 +248,6 @@ def update_player_frame (mod, frame, tick): #math for frame
     return tick, frame
 
 
-player_rect = pygame.Rect(100, 200, 32, 32) #player hitbox
-#                                   ^^  ^^ change this number to alter player hitbox
 
 
 
@@ -323,6 +343,12 @@ while True:
         chunk_world_x = chunk_x * chunk_pixel_w
         chunk_world_y = chunk_y * chunk_pixel_h
         tile_rect.extend(tile_map.get_rects(chunk_world_x,chunk_world_y))
+    # *--------------------------SPAWNING/DESPAWNING ZOMBIES----------------------------------
+
+    zombie_index = check_load(position_chunk_x)
+    despawn(zombies, zombie_index)
+    print(zombies_y_momentums)
+
     # *---------------------------------------------------------------------------
 
     # *--PLAYER HORIZONTAL MOVEMENT + COLLISIONS--*
@@ -431,16 +457,19 @@ while True:
     for i in range(len(zombies)):
         zombie_move = [0,0]
 
-        
+        speed_pool = [1, 2, 3]
+        speed_weightage = [70,25,5]
+        random_zomb_speed = random.choices(speed_pool, weights=speed_weightage, k=1)[0]    
+
         if len(zombie_move_choices) != 0:
             #move right
             if zombie_move_choices[i] == 'Right':
-                zombie_move[0] = 2
+                zombie_move[0] = random_zomb_speed
                 zombies[i].x += zombie_move[0]
 
             #move left
             if zombie_move_choices[i] == 'Left':
-                zombie_move[0]= -2
+                zombie_move[0]= -random_zomb_speed
                 zombies[i].x += zombie_move[0]
 
             #dont move
@@ -451,7 +480,6 @@ while True:
             pass
         
         zombies_movements.append(zombie_move)
-
     
 
     #ZOMBIE HORIZONTAL MOVEMENT
@@ -468,6 +496,12 @@ while True:
 
     zombies_y_momentums = []
     for i in range(len(zombies)):
+
+        # for i in range(len(zombies)): #despawns zombies if they are too low
+        #     if zombies[i].y > 1200:
+        #         zombies.pop(i)
+        #     else:
+                
         zombies_movements[i][1] = zombie_y_mom
         zombie_y_mom += 0.2
         if zombie_y_mom > 4.5:
@@ -567,7 +601,19 @@ while True:
     elif moving_right == True:
         x_flip = False
     else:
-         pass
+         pass  
+
+    zombies_x_flips = []
+    for i in range(len(zombies)):
+        if zombies_movements[i][0] > 0:
+            zombie_flip = False
+            zombies_x_flips.append(zombie_flip)
+        elif zombies_movements[i][0] < 0:
+            zombie_flip = True
+            zombies_x_flips.append(zombie_flip)
+        else:
+            zombie_flip = False
+            zombies_x_flips.append(zombie_flip)
 
  
     current_frames = update_action(mode) #determines the current type of animation playing
@@ -575,8 +621,12 @@ while True:
     player_sprite = current_frames[index] #determines the image/sprite which will be displayed on player pos
     canvas.blit(pygame.transform.flip(player_sprite, x_flip, False), player_render_pos) 
 
+
     for i in range(len(zombies)):
-        canvas.blit(zombie_sprite, (zombies_render_positions[i]))
+        if len(zombies_x_flips) != 0:
+            canvas.blit(pygame.transform.flip(zombie_sprite, zombies_x_flips[i], False), (zombies_render_positions[i]))
+        else:
+            canvas.blit(zombie_sprite, (zombies_render_positions[i]))
 
      
 
