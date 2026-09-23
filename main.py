@@ -5,16 +5,32 @@ import pygame
 from perlin_noise import PerlinNoise
 from pygame.locals import *
 
-import config
 from player import Player, Player_Sprite
 from spritesheet import Spritesheet
 from tilemap import *
 
-# Parse command-line arguments
+# Safely get the brightness argument, default to 0, and keep it between 0 and 100.
 brightness = 0
 if "--brightness" in sys.argv:
     brightness = int(sys.argv[sys.argv.index("--brightness") + 1])
     brightness = max(0, min(100, brightness))
+
+# Brightness
+def create_brightness_surface(value):
+    # 0 = 65% brightness, 50 = 100%, 100 = 125%.
+    brightness_surface = pygame.Surface((base_res_x, base_res_y))
+
+    if value < 50:
+        factor = 0.65 + (value / 50.0) * 0.35
+        rgb_value = int(factor * 255)
+        brightness_surface.fill((rgb_value, rgb_value, rgb_value))
+    elif value > 50:
+        factor = 1.0 + ((value - 50) / 50.0) * 0.25
+        add_value = int((factor - 1.0) * 255)
+        brightness_surface.fill((add_value, add_value, add_value))
+
+    return brightness_surface
+
 
 pygame.init()
 
@@ -39,6 +55,8 @@ status = RESIZABLE
 pygame.display.set_caption("Return To Sender") 
 canvas = pygame.Surface((base_res_x, base_res_y))
 screen = pygame.display.set_mode((screen_state_w, screen_state_h), status)
+
+brightness_surface = create_brightness_surface(brightness)
 
 
 clock = pygame.time.Clock() #assigning the clock function to a variable to use for the fps in the gameloop
@@ -596,17 +614,12 @@ while True:
     # all sprites are all originally drawn to the right side.
 
     # Brightness
-    brightness_overlay = pygame.Surface((base_res_x, base_res_y))
-    brightness_overlay.fill((0, 0, 0))
 
-    brightness_alpha = int((100 - brightness) / 100 * 255)
-    brightness_overlay.set_alpha(brightness_alpha)
-
-    canvas.blit(brightness_overlay, (0, 0))
-
-    #scale the screen
-    scaled_resolution = pygame.transform.scale(canvas, (screen_state_w, screen_state_h))
-
+    # The brightness surface is created once when the game starts.
+    if brightness < 50:
+        canvas.blit(brightness_surface, (0, 0), special_flags=pygame.BLEND_RGB_MULT)
+    elif brightness > 50:
+        canvas.blit(brightness_surface, (0, 0), special_flags=pygame.BLEND_RGB_ADD)
 
     #scale the screen
     scaled_resolution = pygame.transform.scale(canvas, (screen_state_w, screen_state_h))

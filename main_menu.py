@@ -5,8 +5,6 @@ from sys import executable, exit
 
 import pygame
 
-import config
-
 pygame.init()
 
 # Save file paths
@@ -202,12 +200,12 @@ resolution_options = [
 selected_resolution = 1
 fullscreen = False
 
-# Audio values (0 - 100)
+# Audio values
 master_volume = 100
 music_volume = 80
 sfx_volume = 100
 
-# Brightness value (0 - 100)
+# Brightness value
 brightness = 0
 
 # Drag state for sliders
