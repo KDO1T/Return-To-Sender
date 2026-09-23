@@ -202,11 +202,11 @@ fullscreen = False
 
 # Audio values
 master_volume = 100
-music_volume = 80
+music_volume = 100
 sfx_volume = 100
 
 # Brightness value
-brightness = 0
+brightness = 50
 
 # Drag state for sliders
 drag = False
