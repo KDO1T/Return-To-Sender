@@ -6,9 +6,9 @@ zombies = []
 
 class Zombie:
 
-    def __init__(self, rect, x_movement, y_momentum, x_flip, render_pos, on_ground, idle_move, ):
+    def __init__(self, rect, movement, y_momentum, x_flip, render_pos, on_ground, idle_move):
         self.rect = rect
-        self.x_movement = x_movement
+        self.movement = movement
         self.y_momentum = y_momentum
         self.x_flip = x_flip
         self.render_pos = render_pos
@@ -16,14 +16,15 @@ class Zombie:
         self.idle_move = idle_move
 
 
-    def generate_rect(self, player_current_chunk_x):
-        self.rect = pygame.Rect((player_current_chunk_x + 640), 50, 32,32)
-         
+    def generate_rect(self, i, player_current_chunk_x):
+
+        self.rect = pygame.Rect(((player_current_chunk_x + 640) + (i*30)), 50, 32,32)
+
         
-    def despawn(zombie_list, deleted_zombie):
-        if deleted_zombie is not None:
-            zombie_list.pop(deleted_zombie)
-            zombies_y_momentums[deleted_zombie] = 0
+    # def despawn(zombie_list, deleted_zombie):
+    #     if deleted_zombie is not None:
+    #         zombie_list.pop(deleted_zombie)
+    #         zombies_y_momentums[deleted_zombie] = 0
 
 
     #animation code
