@@ -17,7 +17,6 @@ class Zombie:
 
 
     def generate_rect(self, i, player_current_chunk_x):
-
         self.rect = pygame.Rect(((player_current_chunk_x + 640) + (i*30)), 50, 32,32)
 
         

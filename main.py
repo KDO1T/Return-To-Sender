@@ -129,26 +129,8 @@ player_rect = pygame.Rect(100, 200, 32, 32) #player hitbox
 
 # *--------------------------------------------ENTITIES-------------------------------------------------------*
 
-
-
-
-
-
-
-#to use later for rendering pos
-# zombies_render_positions = [] #acts the same as player render pos.
-# zombies_movements = [] #holds the x and y values for zombie movement
-# zombie_ground_check = [] #holds boolean if zombie is in the air or not
-# zombie_move_choices = []
-# zombies_y_momentums = []
-# zombies_x_flips = []
-# zombie_y_mom = 0
+#ZOMBIES
 choice_count = 0 #stores the amount of frames it has been to make a new choice
-
-
-
-
-
 zombie_sprite = pygame.image.load('animations/base_zombie.png')
 
 
@@ -334,7 +316,7 @@ while True:
             zombie = Zombie(None, [0,0],0, False, (0,0), None, '')
             zombie.generate_rect(i, position_chunk_x)
             zombies.append(zombie)
-        
+
 
     # *---------------------------------------------------------------------------
 
@@ -475,9 +457,10 @@ while True:
             
     #ZOMBIE VERTICAL MOVEMENT AND GRAVITY + VERTICAL COLLISION
 
+    zombie_gravities = []
 
     for zombie in zombies:
-
+        
         zombie.movement[1] = zombie.y_momentum
         zombie.y_momentum += 0.2
         if zombie.y_momentum > 4.5:
@@ -491,6 +474,8 @@ while True:
 
         zombie.rect.y += zombie.movement[1]
 
+        zombie_gravities.append(zombie.y_momentum)
+
         for tile in tile_rect:
             if zombie.rect.colliderect(tile):
                 if zombie.movement[1] > 0:
@@ -502,6 +487,12 @@ while True:
                     zombie.rect.top = tile.bottom
                     zombie.y_momentum = 0 # <-- same with this
 
+    print(zombie_gravities)
+    #stop zombies from falling through the map by disabling gravity if they're out of range
+    for zombie in zombies:
+        if zombie.rect.x < position_chunk_x:
+            print('balls')
+    
 
                                 # *--ANIMATION--*
  #-----------------------------------------------------------------------------------------------------
@@ -593,7 +584,7 @@ while True:
     canvas.blit(pygame.transform.flip(player_sprite, x_flip, False), player_render_pos) 
 
 
-    for zombie in zombies:  
+    for zombie in zombies:
         canvas.blit(pygame.transform.flip(zombie_sprite, zombie.x_flip, False), (zombie.render_pos))
     
 
