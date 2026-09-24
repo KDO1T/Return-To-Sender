@@ -3,7 +3,7 @@ from pygame.locals import *
 from spritesheet import Spritesheet
 from tilemap import *
 from perlin_noise import PerlinNoise
-from player import Player, Player_Sprite
+from entity import Player, Zombie, zombies
 import random
 pygame.init()
 
@@ -132,7 +132,38 @@ player_rect = pygame.Rect(100, 200, 32, 32) #player hitbox
 
 
 #stores the rect of the zombies
-zombies = []
+
+#Generating Zombies:
+
+player_current_chunk_x, zombie_count
+
+if len(zombies) < zombie_count:
+            for i in range(zombie_count):
+               
+                zombies.append(self.rect)
+
+
+        for i in range(len(zombies)):
+            if zombies[i].x < player_current_chunk_x:
+                zombie_index = i
+                return zombie_index
+
+        return None
+
+
+
+
+
+
+
+
+
+
+# for i in range(5):
+#     zombies.append(Zombie((0,0), 0, False, (0,0), None, None))
+
+
+
 #to use later for rendering pos
 zombies_render_positions = [] #acts the same as player render pos.
 zombies_movements = [] #holds the x and y values for zombie movement
