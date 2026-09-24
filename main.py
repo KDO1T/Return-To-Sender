@@ -140,7 +140,7 @@ player_rect = pygame.Rect(100, 200, 32, 32) #player hitbox
 
 # *--------------------------------------------ENTITIES-------------------------------------------------------*
 
-
+#MAKE ALL OF THIS WITHIN A CLASS LATER ON
 
 #stores the rect of the zombies
 zombies = []
