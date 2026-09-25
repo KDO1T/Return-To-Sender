@@ -419,8 +419,11 @@ while True:
 
     #ZOMBIE MOVEMENT
 
-    for zombie in zombies:
-
+  
+    for zombie in zombies: #freezes movement horizontal movement if zombie isn't in frame
+        if zombie.render_pos[0] < position_chunk_x:
+            zombie.idle_move = 'Still'
+        
         zombie.movement = [0,0]
 
         speed_pool = [1, 2, 3]
@@ -441,8 +444,9 @@ while True:
         if zombie.idle_move == 'Still':
             pass
 
+        
 
-    
+
     
 
     #ZOMBIE HORIZONTAL MOVEMENT
@@ -457,10 +461,9 @@ while True:
             
     #ZOMBIE VERTICAL MOVEMENT AND GRAVITY + VERTICAL COLLISION
 
-    zombie_gravities = []
+
 
     for zombie in zombies:
-        
         zombie.movement[1] = zombie.y_momentum
         zombie.y_momentum += 0.2
         if zombie.y_momentum > 4.5:
@@ -474,7 +477,6 @@ while True:
 
         zombie.rect.y += zombie.movement[1]
 
-        zombie_gravities.append(zombie.y_momentum)
 
         for tile in tile_rect:
             if zombie.rect.colliderect(tile):
@@ -487,11 +489,7 @@ while True:
                     zombie.rect.top = tile.bottom
                     zombie.y_momentum = 0 # <-- same with this
 
-    print(zombie_gravities)
     #stop zombies from falling through the map by disabling gravity if they're out of range
-    for zombie in zombies:
-        if zombie.rect.x < position_chunk_x:
-            print('balls')
     
 
                                 # *--ANIMATION--*
@@ -556,7 +554,10 @@ while True:
     #zombie render code
     for zombie in zombies:
         zombie.render_pos = (zombie.rect.x - camera_x, zombie.rect.y - camera_y)
-    
+
+        #disables zombie gravity if out of range
+        if zombie.render_pos[0] < position_chunk_x:
+            zombie.y_momentum = 0
 
     #flipping code
     
