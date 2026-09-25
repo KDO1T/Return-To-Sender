@@ -19,6 +19,8 @@ screen_state_w, screen_state_h = window_w, window_h
 #camera movement
 camera_x=0 #made it the same as the player's coordinates
 camera_y=0 #made it the same as the player's coordinates
+x_camera_delay = 0
+y_camera_delay = 0
 camera_speed=5 #will make this the difference in current player coordinates 
 
 #base window status
@@ -308,15 +310,15 @@ while True:
 
     #Generating Zombies:
 
-    zombie_count = 1
+    zombie_count = 5
 
     if len(zombies) < zombie_count:
 
         for i in range(zombie_count):
-            zombie = Zombie(None, [0,0],0, False, (0,0), None, '', None, 0, 50, 5)
+            zombie = Zombie(None, [0,0],0, False, (0,0), None, '',None, 0, 0, 50, 5)
             zombie.generate_rect(i, position_chunk_x)
             zombies.append(zombie)
-
+            zombie.chase_speed = random.randint(1,3)
 
     # *---------------------------------------------------------------------------
 
@@ -349,7 +351,7 @@ while True:
     #PLAYER
     #gravity
     player_movement[1] = player_y_momentum
-    
+    #sada
     player_y_momentum += 0.2
     if player_y_momentum > 10:
         player_y_momentum = 10
@@ -437,11 +439,11 @@ while True:
 
             try:
                 if zombie.render_pos > player_render_pos:
-                    zombie.movement[0] = -2
+                    zombie.movement[0] = -zombie.chase_speed
                     zombie.rect.x += zombie.movement[0]
 
                 if zombie.render_pos < player_render_pos:
-                    zombie.movement[0] = 2
+                    zombie.movement[0] = zombie.chase_speed
                     zombie.rect.x += zombie.movement[0]
                     
             except NameError:
@@ -581,17 +583,81 @@ while True:
     #     #updating y offset
     #     current_y += row[0].map_h
 
+    #X camera delay
+    if abs(player_movement[0]) > 0:
+        if player_movement[0] > 0: #if player moving right
+            if x_camera_delay < 0: #if player was previously moving left
+                x_camera_delay += 0.8 
+            else:
+                x_camera_delay += 0.4 #if from 0
+                if x_camera_delay >= 20:
+                    x_camera_delay = 20
+
+        if player_movement[0] < 0:#if player moving left
+            if x_camera_delay > 0:#if player was previously moving right
+                x_camera_delay -= 0.8
+            else:
+                x_camera_delay -= 0.4 #if from 0
+                if x_camera_delay <= -20:
+                    x_camera_delay = -20
+    else:
+        if x_camera_delay > 0: #if player isn't moving then revert back to original
+            x_camera_delay -= 1.0
+            if x_camera_delay <= 0:
+                x_camera_delay = 0
+
+        if x_camera_delay < 0: #same with this
+            x_camera_delay += 1.0
+            if x_camera_delay >= 0:
+                x_camera_delay = 0
+
+    
+    #Y camera delay
+    if not on_ground and abs(player_movement[1]) > 0:
+        if player_movement[1] > 0: #if player moving down
+            if y_camera_delay < 0: #if player was previously moving up
+                y_camera_delay += 0.8 
+            else:
+                y_camera_delay += 0.4 #if from 0
+                if y_camera_delay >= 20:
+                    y_camera_delay = 20
+
+        if player_movement[1] < 0:#if player moving up
+            if y_camera_delay > 0:#if player was previously moving down
+                y_camera_delay -= 0.8
+            else:
+                y_camera_delay -= 0.4 #if from 0
+                if y_camera_delay <= -20:
+                    y_camera_delay = -20
+    else:
+        if y_camera_delay > 0: #if player isn't moving then revert back to original
+            y_camera_delay -= 1.0
+            if y_camera_delay <= 0:
+                y_camera_delay = 0
+
+        if y_camera_delay < 0: #same with this
+            y_camera_delay += 1.0
+            if y_camera_delay >= 0:
+                y_camera_delay = 0
+
+
+
+
     for (chunk_x,chunk_y), tile_map in loaded_chunks.items():
         chunk_world_x = chunk_x *chunk_pixel_w
         chunk_world_y = chunk_y * chunk_pixel_h
-        tile_map.draw_map(canvas, camera_x, camera_y,offset_x=chunk_world_x,offset_y=chunk_world_y)
+        tile_map.draw_map(canvas, (camera_x + x_camera_delay), (camera_y + y_camera_delay) ,offset_x=chunk_world_x,offset_y=chunk_world_y)
+    #                                        ^positive map delay           ^
 
-    player_render_pos = (player_rect.x - camera_x, player_rect.y - camera_y) #centers player on screen
 
+     
+    
+    player_render_pos = ((player_rect.x - camera_x) - x_camera_delay, (player_rect.y - camera_y) - y_camera_delay) #centers player on screen
+    #                                                                                                   ^negative camera delay
     #zombie render code
     for zombie in zombies:
-        zombie.render_pos = (zombie.rect.x - camera_x, zombie.rect.y - camera_y)
-
+        zombie.render_pos = ((zombie.rect.x - camera_x) - x_camera_delay, (zombie.rect.y - camera_y) - y_camera_delay)
+    #                                                                                                   ^negative camera delay
         #disables zombie gravity if out of range
         if zombie.render_pos[0] < position_chunk_x:
             zombie.y_momentum = 0

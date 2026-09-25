@@ -26,7 +26,7 @@ zombies = []
 
 class Zombie:
 
-    def __init__(self, rect, movement, y_momentum, x_flip, render_pos, on_ground, idle_move, chase_player, attack_count, HP, ATK):
+    def __init__(self, rect, movement, y_momentum, x_flip, render_pos, on_ground, idle_move, chase_player, chase_speed ,attack_count, HP, ATK):
         self.rect = rect
         self.movement = movement
         self.y_momentum = y_momentum
@@ -35,6 +35,7 @@ class Zombie:
         self.on_ground = on_ground
         self.idle_move = idle_move
         self.chase_player = chase_player
+        self.chase_speed = chase_speed
         self.attack_count = attack_count
         self.HP = HP
         self.ATK = ATK
@@ -49,7 +50,7 @@ class Zombie:
         x_distance = abs(self.render_pos[0] - player_position[0])
         y_distance = abs(self.render_pos[1] - player_position[1])
 
-        if x_distance <= 90 and y_distance <= 90:
+        if x_distance <=128 and y_distance <= 128:
             self.chase_player = True 
         else:
             self.chase_player = False
