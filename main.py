@@ -313,7 +313,7 @@ while True:
     if len(zombies) < zombie_count:
 
         for i in range(zombie_count):
-            zombie = Zombie(None, [0,0],0, False, (0,0), None, '')
+            zombie = Zombie(None, [0,0],0, False, (0,0), None, '', None, 0)
             zombie.generate_rect(i, position_chunk_x)
             zombies.append(zombie)
 
@@ -419,30 +419,55 @@ while True:
 
     #ZOMBIE MOVEMENT
 
-  
+    for zombie in zombies:
+        try:#because initially player_render_pos hasn't been defined yet
+            zombie.aggro_player(player_render_pos) 
+        except NameError:
+            pass
+    
+
+    
     for zombie in zombies: #freezes movement horizontal movement if zombie isn't in frame
         if zombie.render_pos[0] < position_chunk_x:
             zombie.idle_move = 'Still'
         
         zombie.movement = [0,0]
 
-        speed_pool = [1, 2, 3]
-        speed_weightage = [70,25,5]
-        random_zomb_speed = random.choices(speed_pool, weights=speed_weightage, k=1)[0]    
-        
-        #move right
-        if zombie.idle_move == 'Right':
-            zombie.movement[0] = random_zomb_speed
-            zombie.rect.x += zombie.movement[0]
+        if zombie.chase_player == True: #chase player
 
-        #move left
-        if zombie.idle_move == 'Left':
-            zombie.movement[0] = -random_zomb_speed
-            zombie.rect.x += zombie.movement[0]
+            try:
+                if zombie.render_pos > player_render_pos:
+                    zombie.movement[0] = -2
+                    zombie.rect.x += zombie.movement[0]
 
-        #dont move
-        if zombie.idle_move == 'Still':
-            pass
+                if zombie.render_pos < player_render_pos:
+                    zombie.movement[0] = 2
+                    zombie.rect.x += zombie.movement[0]
+                    
+            except NameError:
+                pass
+
+
+
+        else: #idle movement
+
+            speed_pool = [1, 2, 3]
+            speed_weightage = [70,25,5]
+            random_zomb_speed = random.choices(speed_pool, weights=speed_weightage, k=1)[0]    
+            
+            #move right
+            if zombie.idle_move == 'Right':
+                zombie.movement[0] = random_zomb_speed
+                zombie.rect.x += zombie.movement[0]
+
+            #move left
+            if zombie.idle_move == 'Left':
+                zombie.movement[0] = -random_zomb_speed
+                zombie.rect.x += zombie.movement[0]
+
+            #dont move
+            if zombie.idle_move == 'Still':
+                pass
 
         
 
