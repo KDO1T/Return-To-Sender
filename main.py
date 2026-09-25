@@ -308,12 +308,12 @@ while True:
 
     #Generating Zombies:
 
-    zombie_count = 8
+    zombie_count = 1
 
     if len(zombies) < zombie_count:
 
         for i in range(zombie_count):
-            zombie = Zombie(None, [0,0],0, False, (0,0), None, '', None, 0)
+            zombie = Zombie(None, [0,0],0, False, (0,0), None, '', None, 0, 50, 5)
             zombie.generate_rect(i, position_chunk_x)
             zombies.append(zombie)
 
@@ -514,8 +514,20 @@ while True:
                     zombie.rect.top = tile.bottom
                     zombie.y_momentum = 0 # <-- same with this
 
-    #stop zombies from falling through the map by disabling gravity if they're out of range
+
+                            # PLAYER ZOMBIE INTERACTION 
+#-----------------------------------------------------------------------------------------------------
     
+    #ATTACK
+    for zombie in zombies:
+        zombie.touch_player(player_rect)
+        zombie.attack_player()
+
+
+
+
+
+
 
                                 # *--ANIMATION--*
  #-----------------------------------------------------------------------------------------------------
