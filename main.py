@@ -44,29 +44,30 @@ chunk_tiles_y = 16
 chunk_pixel_w = chunk_tiles_x*tile_size
 chunk_pixel_h = chunk_tiles_y*tile_size
 
+set_seed = random.randint(1,10000)
 
 world = World_Generation(
     tile_size = tile_size,
     chunk_tiles_x = chunk_tiles_x,
     chunk_tiles_y= chunk_tiles_y,
-    noise1d=PerlinNoise(octaves=2, seed = int(1234)),
-    noise2d=PerlinNoise(octaves=3, seed = int(1234))
+    noise1d=PerlinNoise(octaves=2, seed = int(set_seed)),
+    noise2d=PerlinNoise(octaves=3, seed = int(set_seed))
 )
 
 render_distance = 2
 #*---------------------------------------------------------------STAGES------------------------------------------------------------------------*
 #STAGE
-current_stage = 1
+current_stage = 3
 stage_length = 8
 #(-1)*(16tiles/1chunk) = minimum world_chunks
 min_world_chunks = 0
 max_world_chunks = 0
 loaded_chunks = {}
 
-
+spritesheet_pool = ['grass_spritesheet.png','cartoon_spritesheet.png']
 
 def load_stage(stage_number):
-    global current_stage, min_world_chunks, max_world_chunks, loaded_chunks, world, player_rect, current_spritesheet
+    global current_stage, min_world_chunks, max_world_chunks, loaded_chunks, world, player_rect, current_spritesheet, spritesheet_pool
 
     current_stage = stage_number
     loaded_chunks.clear() #resets chunks loaded
@@ -78,17 +79,22 @@ def load_stage(stage_number):
     min_world_chunks = stage_min_chunk_x*world.chunk_pixel_w
     max_world_chunks = (stage_max_chunk_x+1)*world.chunk_pixel_w    
 
+    if len(spritesheet_pool)>0:
+        map_index = random.randrange(len(spritesheet_pool))
+
     #STAGE UPDATES
 
     if stage_number == 1:
-        new_seed = 1234
-        current_spritesheet = Spritesheet('spritesheet.png')
+        new_seed = random.randint(1,10000)
+        current_spritesheet = Spritesheet(spritesheet_pool[map_index])
+        spritesheet_pool.pop(map_index)
     elif stage_number ==2:
-        new_seed = 5678
-        current_spritesheet = Spritesheet('spritesheet.png')
+        new_seed = random.randint(1,10000)
+        current_spritesheet = Spritesheet(spritesheet_pool[map_index])
+        spritesheet_pool.pop(map_index)
     else:
-        new_seed = 9101112
-        current_spritesheet = Spritesheet('spritesheet.png')
+        new_seed = 69420
+        current_spritesheet = Spritesheet('plague_spritesheet.png')
 
     #reinitialise perlin
     #Surface_Level
@@ -365,6 +371,7 @@ while True:
     #next stage
     if player_rect.right >= max_world_chunks:
         load_stage(current_stage+1)
+        
 
 #---------------------------------------------------------------------
 
