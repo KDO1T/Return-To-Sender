@@ -32,7 +32,7 @@ screen = pygame.display.set_mode((screen_state_w, screen_state_h), status)
 
 clock = pygame.time.Clock() #assigning the clock function to a variable to use for the fps in the gameloop
 
-# *-- MAP STUFF --*
+# *------------------------------------------------------------------- MAP STUFF -----------------------------------------------------------------------------------------*
 sprites = Spritesheet('spritesheet.png')
 
 tile_size = 32
@@ -45,7 +45,16 @@ chunk_pixel_h = chunk_tiles_y*tile_size
 
 render_distance = 2
 loaded_chunks = {}
-set_seed = 1234
+set_seed = random.randint(1,10000)
+
+#stage chunks
+stage_min_chunk_x = -1
+stage_max_chunk_x = 7
+
+#(-1)*(16tiles/1chunk) = minimum world_chunks
+min_world_chunks = stage_min_chunk_x*chunk_pixel_w
+max_world_chunks = (stage_max_chunk_x+1)*chunk_pixel_w
+
 
 #Surface_Level
 noise_1d = PerlinNoise(octaves=2, seed = int(set_seed))
@@ -64,7 +73,7 @@ def generate_chunk_data(chunk_x, chunk_y):
     base_height = 7
     amplitude = 10
 
-    for y in range(chunk_tiles_y):
+    for y in range(-1,chunk_tiles_y):
         row = []
         world_tile_y = chunk_y*chunk_tiles_y + y
         for x in range(chunk_tiles_x):
@@ -101,10 +110,39 @@ def generate_chunk_data(chunk_x, chunk_y):
                 if cave_volume <= cave_threshold:
                     row.append('-1')
                 else:
-                    row.append('11')
-            
-                    
+                    row.append('11')         
         grid.append(row)
+
+
+        for y in range(len(grid)):
+            if y < len(grid):
+                col = len(grid[y])
+            else:
+                col = 0
+            for x in range(col):
+
+                if grid[y][x] == '11':
+
+                    if y>0 and (y+1) < len(grid):           #checks if there is a row above and below
+                            
+                        if x < len(grid[y-1]) and x < len(grid[y+1]):  #checks if there is a row beside the column
+                            tile_above = grid[y-1][x]
+                            tile_below = grid[y+1][x]
+
+                            if tile_above == '-1' and tile_below == '11':
+                                grid[y][x] = '1'
+
+        for x in range(len(grid[0])):
+            for y in range(len(grid)):
+
+                if grid[y][x] == '11':
+
+  
+                        if y>0:  #checks if there is a row beside the column
+                            tile_above = grid[y-1][x]
+
+                            if tile_above == '-1':
+                                grid[y][x] = '1'
     return grid
 
  
@@ -359,6 +397,13 @@ while True:
             if player_movement[0] < 0:
                 player_rect.left = tile.right
 
+    #clamping
+    if player_rect.left < min_world_chunks:
+        player_rect.left = min_world_chunks
+
+    if player_rect.right > max_world_chunks:
+        player_rect.right = max_world_chunks
+
 #---------------------------------------------------------------------
 
     # *-- PLAYER VERTICAL MOVEMENT + VERTICAL COLLISIONS --*
@@ -535,11 +580,8 @@ while True:
     camera_y = player_rect.centery - (base_res_y // 2)
 
      #map clamping      
-    # max_cam_x = total_map_w - base_res_x
-    # max_cam_y = total_map_h - base_res_y
-
-    # camera_x = max(0, min(camera_x, max_cam_x))
-    # camera_y = max(0, min(camera_y, max_cam_y))
+    max_camera_x = max_world_chunks - base_res_x
+    camera_x = max(min_world_chunks, min(camera_x, max_camera_x))
 
 
 
