@@ -2,12 +2,30 @@ import pygame, sys, random
 
 
 class Player:
-
     # *--STATS--*
     #level is the player's level, while exp is what the player gains to increase in level
     #dollars is the money the player gains throughout runs while s_coin (soul coins) is the metacurrency
-    def __init__(self, Name, HP, ATK, CRIT_DMG, CRIT_CHANCE, LEVEL, EXP, DOLLARS, S_COIN):
+    def __init__(self, Name,rect,movement,moving_up,moving_down ,moving_right ,moving_left, press_space, y_momentum,max_air_jumps,jump,on_ground,x_flip,
+                 all_frames ,current_frames ,frame_index, animation_mode, animation_count, HP, ATK, CRIT_DMG, CRIT_CHANCE, LEVEL, EXP, DOLLARS, S_COIN):
         self.Name = Name
+        self.rect = rect
+        self.movement = movement
+        self.moving_up = moving_up
+        self.moving_down = moving_down
+        self.moving_right = moving_right
+        self.moving_left = moving_left
+        self.press_space = press_space
+        self.y_momentum = y_momentum
+        self.max_air_jumps = max_air_jumps
+        self.air_jump_count = max_air_jumps
+        self.jump = jump
+        self.on_ground = on_ground
+        self.x_flip = x_flip
+        self.all_frames = all_frames
+        self.current_frames = current_frames
+        self.frame_index = frame_index
+        self.animation_mode = animation_mode
+        self.animation_count = animation_count
         self.HP = HP
         self.ATK = ATK
         self.CRIT_DMG = CRIT_DMG
@@ -17,6 +35,41 @@ class Player:
         self.DOLLARS = DOLLARS
         self.S_COIN = S_COIN
 
+    def update_action (self):
+
+        if self.animation_mode == 0: #idle
+           self.current_frames = self.all_frames[0:5]
+
+        if self.animation_mode == 1: #walk
+            self.current_frames = self.all_frames[6:10]
+
+        if self.animation_mode == 2: #jump
+            self.current_frames = self.all_frames[11:14]
+
+        if self.animation_mode == 3: #fall
+            self.current_frames = self.all_frames[15:17]
+
+        return self.current_frames
+
+    def update_player_frame (self): #math for frame indexing
+        self.animation_count += 1
+
+        if self.animation_count == 60:
+            self.animation_count = 0
+
+        if self.animation_mode == 0: #idling
+            self.frame_index = (self.animation_count // 10) % len(self.current_frames)
+
+        if self.animation_mode == 1: #walking
+            self.frame_index = (self.animation_count // 12) % len(self.current_frames)
+            
+        if self.animation_mode == 2: #jumping
+            self.frame_index = (self.animation_count // 15) % len(self.current_frames)
+            
+        if self.animation_mode == 3: #falling
+            self.frame_index = (self.animation_count // 20) % len(self.current_frames)
+
+        return self.animation_count, self.frame_index
 
 
     
