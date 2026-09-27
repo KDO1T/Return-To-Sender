@@ -120,8 +120,9 @@ player = Player(
     frame_index = 0,
     animation_mode = 0,
     animation_count = 0,
-    HP=None,    
-    ATK=None, 
+    HP=100,    
+    ATK=5, 
+    attacked = False,
     CRIT_DMG=None, 
     CRIT_CHANCE=None, 
     LEVEL=None, 
@@ -179,8 +180,8 @@ while True:
 
 
 
-    player.jump = False
-        
+    player.jump = False #resets jump
+    player.attacked = False #resets player attack
 
 
 
@@ -227,6 +228,8 @@ while True:
                 player.moving_left = True
             if event.key == pygame.K_SPACE:
                 player.press_space = True
+            if event.key == pygame.K_f:
+                player.attacked = True
 
 
             # *--KEY IS LET GO--*  
@@ -275,7 +278,7 @@ while True:
     if len(zombies) < zombie_count:
 
         for i in range(zombie_count):
-            zombie = Zombie(None, [0,0],0, False, (0,0), None, '',None, 0, 0, 50, 5)
+            zombie = Zombie(None, [0,0],0,0, False, (0,0), None, '',None, 0, 0, False, False, False,0,30,50, 5)
             zombie.generate_rect(i, position_chunk_x)
             zombies.append(zombie)
             zombie.chase_speed = random.randint(1,3)
@@ -311,7 +314,7 @@ while True:
     #PLAYER
     #gravity
     player.movement[1] = player.y_momentum
-    #sada
+    
     player.y_momentum += 0.2
     if player.y_momentum > 10:
         player.y_momentum = 10
@@ -359,6 +362,26 @@ while True:
     if player.jump == True:
         player.y_momentum = -4.5
 
+#------------------------------------PLAYER ZOMBIE INTERACTION---------------------------------------------------
+
+    #PLAYER ATTACKING ZOMBIES
+    for zombie in zombies:
+        zombie.damaged = player.attack(zombie.rect, zombie.damaged)
+        zombie.receive_damage(player.ATK)
+        zombie.receive_knockback(player.mom_force, player.x_flip)
+        zombie.check_staggered()
+
+    #ZOMBIES ATTACKING PLAYER
+    for zombie in zombies:
+        zombie.touch_player(player.rect)
+        zombie.attack_player()
+
+    
+    
+    
+    
+    
+    
 # *---------------------------------------ENTITIES---------------------------------------------------------
 
 
@@ -379,7 +402,7 @@ while True:
                 zombie.idle_move = random.choices(action_pool, weights=action_weightage, k=1)[0]
                 
 
-    #ZOMBIE MOVEMENT
+    #ZOMBIE HORIZONTAL MOVEMENT
 
     for zombie in zombies:
         try:#because initially player_render_pos hasn't been defined yet
@@ -395,48 +418,51 @@ while True:
         
         zombie.movement = [0,0]
 
-        if zombie.chase_player == True: #chase player
+        if zombie.staggered == False: #if zombie is not staggered
+            if zombie.chase_player == True: #chase player
 
-            try:
-                if zombie.render_pos > player_render_pos:
-                    zombie.movement[0] = -zombie.chase_speed
+                try:
+                    if zombie.render_pos > player_render_pos:
+                        zombie.movement[0] = -zombie.chase_speed
+                        zombie.rect.x += zombie.movement[0]
+
+                    if zombie.render_pos < player_render_pos:
+                        zombie.movement[0] = zombie.chase_speed
+                        zombie.rect.x += zombie.movement[0]
+                        
+                except NameError:
+                    pass
+
+
+
+            else: #idle movement
+
+                speed_pool = [1, 2, 3]
+                speed_weightage = [70,25,5]
+                random_zomb_speed = random.choices(speed_pool, weights=speed_weightage, k=1)[0]    
+                
+                #move right
+                if zombie.idle_move == 'Right':
+                    zombie.movement[0] = random_zomb_speed
                     zombie.rect.x += zombie.movement[0]
 
-                if zombie.render_pos < player_render_pos:
-                    zombie.movement[0] = zombie.chase_speed
+                #move left
+                if zombie.idle_move == 'Left':
+                    zombie.movement[0] = -random_zomb_speed
                     zombie.rect.x += zombie.movement[0]
-                    
-            except NameError:
-                pass
 
-
-
-        else: #idle movement
-
-            speed_pool = [1, 2, 3]
-            speed_weightage = [70,25,5]
-            random_zomb_speed = random.choices(speed_pool, weights=speed_weightage, k=1)[0]    
+                #dont move
+                if zombie.idle_move == 'Still':
+                    pass
+        else: #if zombie is staggered
+            zombie.movement = [0,0]
             
-            #move right
-            if zombie.idle_move == 'Right':
-                zombie.movement[0] = random_zomb_speed
-                zombie.rect.x += zombie.movement[0]
+    #HORIZONTAL KNOCKBACK CODE
 
-            #move left
-            if zombie.idle_move == 'Left':
-                zombie.movement[0] = -random_zomb_speed
-                zombie.rect.x += zombie.movement[0]
-
-            #dont move
-            if zombie.idle_move == 'Still':
-                pass
-
-        
+    #blahblahblah
 
 
-    
-
-    #ZOMBIE HORIZONTAL MOVEMENT
+    #ZOMBIE HORIZONTAL COLLISIONS
     for tile in tile_rect:    
         for zombie in zombies:
             if zombie.rect.colliderect(tile):
@@ -475,20 +501,6 @@ while True:
                 if zombie.movement[1] < 0:
                     zombie.rect.top = tile.bottom
                     zombie.y_momentum = 0 # <-- same with this
-
-
-                            # PLAYER ZOMBIE INTERACTION 
-#-----------------------------------------------------------------------------------------------------
-    
-    #ATTACK
-    for zombie in zombies:
-        zombie.touch_player(player.rect)
-        zombie.attack_player()
-
-
-
-
-
 
 
                                 # *--ANIMATION--*
