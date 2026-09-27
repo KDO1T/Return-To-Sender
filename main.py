@@ -3,6 +3,7 @@ from pygame.locals import *
 from spritesheet import Spritesheet
 from tilemap import *
 from perlin_noise import PerlinNoise
+from world import World_Generation
 from player import Player, Player_Sprite
 import random
 pygame.init()
@@ -33,7 +34,7 @@ screen = pygame.display.set_mode((screen_state_w, screen_state_h), status)
 clock = pygame.time.Clock() #assigning the clock function to a variable to use for the fps in the gameloop
 
 # *------------------------------------------------------------------- MAP STUFF -----------------------------------------------------------------------------------------*
-sprites = Spritesheet('spritesheet.png')
+current_spritesheet = None
 
 tile_size = 32
 #16 tiles / chunk
@@ -43,109 +44,64 @@ chunk_tiles_y = 16
 chunk_pixel_w = chunk_tiles_x*tile_size
 chunk_pixel_h = chunk_tiles_y*tile_size
 
+
+world = World_Generation(
+    tile_size = tile_size,
+    chunk_tiles_x = chunk_tiles_x,
+    chunk_tiles_y= chunk_tiles_y,
+    noise1d=PerlinNoise(octaves=2, seed = int(1234)),
+    noise2d=PerlinNoise(octaves=3, seed = int(1234))
+)
+
 render_distance = 2
-loaded_chunks = {}
-set_seed = random.randint(1,10000)
-
-#stage chunks
-stage_min_chunk_x = -1
-stage_max_chunk_x = 7
-
+#*---------------------------------------------------------------STAGES------------------------------------------------------------------------*
+#STAGE
+current_stage = 1
+stage_length = 8
 #(-1)*(16tiles/1chunk) = minimum world_chunks
-min_world_chunks = stage_min_chunk_x*chunk_pixel_w
-max_world_chunks = (stage_max_chunk_x+1)*chunk_pixel_w
+min_world_chunks = 0
+max_world_chunks = 0
+loaded_chunks = {}
 
 
-#Surface_Level
-noise_1d = PerlinNoise(octaves=2, seed = int(set_seed))
-#Caves
-noise_2d = PerlinNoise(octaves=3, seed = int(set_seed))
+
+def load_stage(stage_number):
+    global current_stage, min_world_chunks, max_world_chunks, loaded_chunks, world, player_rect, current_spritesheet
+
+    current_stage = stage_number
+    loaded_chunks.clear() #resets chunks loaded
+
+    stage_min_chunk_x = ((stage_number-1)*stage_length) - 1
+    stage_max_chunk_x = stage_min_chunk_x + stage_length
+
+    #(-1)*(16tiles/1chunk) = minimum world_chunks
+    min_world_chunks = stage_min_chunk_x*world.chunk_pixel_w
+    max_world_chunks = (stage_max_chunk_x+1)*world.chunk_pixel_w    
+
+    #STAGE UPDATES
+
+    if stage_number == 1:
+        new_seed = 1234
+        current_spritesheet = Spritesheet('spritesheet.png')
+    elif stage_number ==2:
+        new_seed = 5678
+        current_spritesheet = Spritesheet('spritesheet.png')
+    else:
+        new_seed = 9101112
+        current_spritesheet = Spritesheet('spritesheet.png')
+
+    #reinitialise perlin
+    #Surface_Level
+    world.noise_1d = PerlinNoise(octaves=2, seed = int(new_seed))
+    #Caves
+    world.noise_2d = PerlinNoise(octaves=3, seed = int(new_seed))
+
+    #reset player to new stage
+    player_rect.x = (stage_min_chunk_x + 1)*world.chunk_pixel_w + 64
+    player_rect.y = 100
 
 
-def world_to_chunk(world_x,world_y):
-    chunk_coordinate_x, chunk_coordinate_y = int(world_x//chunk_pixel_w), int(world_y//chunk_pixel_h)
-    return chunk_coordinate_x, chunk_coordinate_y
 
-def generate_chunk_data(chunk_x, chunk_y):
-    grid = []
-    surface_scale = 0.02
-    cave_scale = 0.04
-    base_height = 7
-    amplitude = 10
-
-    for y in range(-1,chunk_tiles_y):
-        row = []
-        world_tile_y = chunk_y*chunk_tiles_y + y
-        for x in range(chunk_tiles_x):
-            world_tile_x = chunk_x*chunk_tiles_x + x
-
-            noise_volume = noise_1d([world_tile_x*surface_scale])
-            surface_y = base_height + int(noise_volume*amplitude)
-
-            cave_volume = noise_2d([world_tile_x * cave_scale , world_tile_y * cave_scale])
-
-            depth = world_tile_y - surface_y
-
-            #the depth determines how deep the caves should go
-            if depth < 0:
-                row.append('-1')
-            #surface Layer
-            elif depth == 0:
-                if cave_volume <= -0.25:
-                    row.append('-1')
-                else:
-                    row.append('1')
-            elif depth <4:
-                if cave_volume <= -0.22:
-                    row.append('-1')
-                else:
-                    row.append('11')
-            #underground Caves
-            else:
-                cave_threshold = -0.01 + min(0.15, (depth-4)*0.01)
-
-                if depth >20:
-                    cave_threshold -= (depth-20)*0.02
-
-                if cave_volume <= cave_threshold:
-                    row.append('-1')
-                else:
-                    row.append('11')         
-        grid.append(row)
-
-
-        for y in range(len(grid)):
-            if y < len(grid):
-                col = len(grid[y])
-            else:
-                col = 0
-            for x in range(col):
-
-                if grid[y][x] == '11':
-
-                    if y>0 and (y+1) < len(grid):           #checks if there is a row above and below
-                            
-                        if x < len(grid[y-1]) and x < len(grid[y+1]):  #checks if there is a row beside the column
-                            tile_above = grid[y-1][x]
-                            tile_below = grid[y+1][x]
-
-                            if tile_above == '-1' and tile_below == '11':
-                                grid[y][x] = '1'
-
-        for x in range(len(grid[0])):
-            for y in range(len(grid)):
-
-                if grid[y][x] == '11':
-
-  
-                        if y>0:  #checks if there is a row beside the column
-                            tile_above = grid[y-1][x]
-
-                            if tile_above == '-1':
-                                grid[y][x] = '1'
-    return grid
-
- 
 # *-----------------------------------------------------------PLAYER STUFF---------------------------------------------------------------------*
 
 player = Player(
@@ -282,6 +238,8 @@ player_rect = pygame.Rect(100, 200, 32, 32) #player hitbox
 
 #note for rendering: whatever is first rendered in the loop will be behind while whatever is last rendered in the loop will be in the very front
 # *--GAME LOOP--*
+load_stage(current_stage)
+
 while True: 
 
 
@@ -351,7 +309,7 @@ while True:
                 moving_left = False
 
     #chunk manager
-    position_chunk_x , position_chunk_y = world_to_chunk(player_rect.centerx, player_rect.centery)
+    position_chunk_x , position_chunk_y = world.world_to_chunk(player_rect.centerx, player_rect.centery)
     needed_chunks = set()
 
     for chunk_y in range(position_chunk_y - render_distance, position_chunk_y + render_distance + 1):
@@ -360,8 +318,8 @@ while True:
             needed_chunks.add(chunk_key)
 
             if chunk_key not in loaded_chunks:
-                raw_data = generate_chunk_data(chunk_x,chunk_y)
-                loaded_chunks[chunk_key] = TileMap(raw_data,sprites, tile_size)
+                raw_data = world.generate_chunk_data(chunk_x,chunk_y)
+                loaded_chunks[chunk_key] = TileMap(raw_data,current_spritesheet, tile_size)
 
     for chunk_key in list(loaded_chunks.keys()):
         if chunk_key not in needed_chunks:
@@ -403,6 +361,10 @@ while True:
 
     if player_rect.right > max_world_chunks:
         player_rect.right = max_world_chunks
+
+    #next stage
+    if player_rect.right >= max_world_chunks:
+        load_stage(current_stage+1)
 
 #---------------------------------------------------------------------
 
