@@ -110,9 +110,14 @@ player = Player(
     moving_right = False,
     moving_left = False,
     press_space = False,
+    aim_up = False,
+    aim_down = False,
+    aim_right = False,
+    aim_left = False,
     y_momentum = 0,
     max_air_jumps = 2,
     jump = False,
+    jump_height = 3,
     on_ground = None,
     x_flip = False,
     all_frames = [],
@@ -238,10 +243,16 @@ while True:
 
             # *--KEY PRESSED--*
         if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_w: #pressing W (up)
+                player.aim_up = True
+            if event.key == pygame.K_s: #pressing S (down)
+                player.aim_down = True
             if event.key == pygame.K_d: #pressing D (right)
                 player.moving_right = True
+                player.aim_right = True
             if event.key == pygame.K_a: #pressing A (left)
                 player.moving_left = True
+                player.aim_left = True
             if event.key == pygame.K_SPACE:
                 player.press_space = True
         
@@ -252,14 +263,16 @@ while True:
 
             if event.key == pygame.K_a and event.key == pygame.K_d and event.key == pygame.K_SPACE: #nothing is being touched
                 player.animation_mode = 0  
-            if event.key == pygame.K_w:#let go of W (up)
-                player.moving_up = False
+            if event.key == pygame.K_w: #let go of W (up)
+                player.aim_up = False
             if event.key == pygame.K_s:#let go of S (down)
-                player.moving_down = False
+                player.aim_down = False
             if event.key == pygame.K_d: #let go of D (right)
                 player.moving_right = False
+                player.aim_right = False
             if event.key == pygame.K_a: #let go of A (left)
                 player.moving_left = False
+                player.aim_left = False
             
 
     #chunk manager
@@ -376,9 +389,9 @@ while True:
     player.press_space = False #just returns it back to the original state so it doesn't infintely jump
 
     if player.jump == True:
-        player.y_momentum = -3
+        player.y_momentum = -player.jump_height
 
-#------------------------------------PLAYER ZOMBIE INTERACTION---------------------------------------------------d
+#------------------------------------PLAYER ZOMBIE INTERACTION---------------------------------------------------
 
     #PLAYER ATTACKING ZOMBIES
     zomb_no = 0

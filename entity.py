@@ -5,9 +5,10 @@ class Player:
     # *--STATS--*
     #level is the player's level, while exp is what the player gains to increase in level
     #dollars is the money the player gains throughout runs while s_coin (soul coins) is the metacurrency
-    def __init__(self, Name,rect,movement,moving_up,moving_down ,moving_right ,moving_left, press_space, y_momentum,max_air_jumps,jump,on_ground,x_flip,
-                 all_frames ,current_frames ,frame_index, animation_mode, animation_count,max_HP, damaged,base_ATK,attacking,attack_dir, first_hit_count,
-                 combo_tick,combo_stage, combo_cooldown, combo_window, max_combo_window, first_hit_cooldown, attacked, CRIT_DMG, CRIT_CHANCE, LEVEL, EXP, DOLLARS, S_COIN):
+    def __init__(self, Name,rect,movement,moving_up,moving_down ,moving_right ,moving_left, aim_up,aim_down, aim_right, aim_left, press_space,
+                  y_momentum,max_air_jumps,jump,jump_height,on_ground,x_flip, all_frames ,current_frames ,frame_index, animation_mode,
+                    animation_count,max_HP, damaged,base_ATK,attacking,attack_dir, first_hit_count, combo_tick,combo_stage, combo_cooldown, combo_window, max_combo_window, 
+                    first_hit_cooldown, attacked, CRIT_DMG, CRIT_CHANCE, LEVEL, EXP, DOLLARS, S_COIN):
         self.Name = Name
         self.rect = rect
         self.movement = movement
@@ -15,11 +16,16 @@ class Player:
         self.moving_down = moving_down
         self.moving_right = moving_right
         self.moving_left = moving_left
+        self.aim_up = aim_up
+        self.aim_down = aim_down
+        self.aim_right = aim_right
+        self.aim_left = aim_left
         self.press_space = press_space
         self.y_momentum = y_momentum
         self.max_air_jumps = max_air_jumps
         self.air_jump_count = max_air_jumps
         self.jump = jump
+        self.jump_height = jump_height
         self.on_ground = on_ground
         self.x_flip = x_flip
         self.all_frames = all_frames
