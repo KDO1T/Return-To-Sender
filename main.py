@@ -4,6 +4,9 @@ from spritesheet import Spritesheet
 from tilemap import *
 from perlin_noise import PerlinNoise
 from entity import Player, Zombie, zombies
+from world import World_Generation
+
+
 import random
 pygame.init()
 
@@ -34,8 +37,8 @@ screen = pygame.display.set_mode((screen_state_w, screen_state_h), status)
 
 clock = pygame.time.Clock() #assigning the clock function to a variable to use for the fps in the gameloop
 
-# *-- MAP STUFF --*
-sprites = Spritesheet('spritesheet.png')
+# *------------------------------------------------------------------- MAP STUFF -----------------------------------------------------------------------------------------*
+current_spritesheet = None
 
 tile_size = 32
 #16 tiles / chunk
@@ -45,71 +48,18 @@ chunk_tiles_y = 16
 chunk_pixel_w = chunk_tiles_x*tile_size
 chunk_pixel_h = chunk_tiles_y*tile_size
 
+set_seed = random.randint(1,10000)
+
+world = World_Generation(
+    tile_size = tile_size,
+    chunk_tiles_x = chunk_tiles_x,
+    chunk_tiles_y= chunk_tiles_y,
+    noise1d=PerlinNoise(octaves=2, seed = int(set_seed)),
+    noise2d=PerlinNoise(octaves=3, seed = int(set_seed))
+)
+
 render_distance = 2
-loaded_chunks = {}
-set_seed = 123456
 
-#Surface_Level
-noise_1d = PerlinNoise(octaves=2, seed = int(set_seed))
-#Caves
-noise_2d = PerlinNoise(octaves=3, seed = int(set_seed))
-
-
-def world_to_chunk(world_x,world_y):
-    chunk_coordinate_x, chunk_coordinate_y = int(world_x//chunk_pixel_w), int(world_y//chunk_pixel_h)
-    return chunk_coordinate_x, chunk_coordinate_y
-
-def generate_chunk_data(chunk_x, chunk_y):
-    grid = []
-    surface_scale = 0.02
-    cave_scale = 0.04
-    base_height = 7
-    amplitude = 10
-
-    for y in range(chunk_tiles_y):
-        row = []
-        world_tile_y = chunk_y*chunk_tiles_y + y
-        for x in range(chunk_tiles_x):
-            world_tile_x = chunk_x*chunk_tiles_x + x
-
-            noise_volume = noise_1d([world_tile_x*surface_scale])
-            surface_y = base_height + int(noise_volume*amplitude)
-
-            cave_volume = noise_2d([world_tile_x * cave_scale , world_tile_y * cave_scale])
-
-            depth = world_tile_y - surface_y
-
-            #the depth determines how deep the caves should go
-            if depth < 0:
-                row.append('-1')
-            #surface Layer
-            elif depth == 0:
-                if cave_volume <= -0.25:
-                    row.append('-1')
-                else:
-                    row.append('1')
-            elif depth <4:
-                if cave_volume <= -0.22:
-                    row.append('-1')
-                else:
-                    row.append('11')
-            #underground Caves
-            else:
-                cave_threshold = -0.01 + min(0.15, (depth-4)*0.01)
-
-                if depth >20:
-                    cave_threshold -= (depth-20)*0.02
-
-                if cave_volume <= cave_threshold:
-                    row.append('-1')
-                else:
-                    row.append('11')
-            
-                    
-        grid.append(row)
-    return grid
-
- 
 # *-----------------------------------------------------------PLAYER STUFF---------------------------------------------------------------------*
 
 player = Player(
@@ -157,6 +107,8 @@ player = Player(
     S_COIN=None
 )
 
+player_rect = player.rect
+
 # *--------------------------------------------ENTITIES-------------------------------------------------------*
 
 #ZOMBIES
@@ -199,9 +151,66 @@ for i in range(3):
 
 
 
+#*---------------------------------------------------------------STAGES------------------------------------------------------------------------*
+#STAGE
+current_stage = 3
+stage_length = 8
+#(-1)*(16tiles/1chunk) = minimum world_chunks
+min_world_chunks = 0
+max_world_chunks = 0
+loaded_chunks = {}
+
+spritesheet_pool = ['grass_spritesheet.png','cartoon_spritesheet.png']
+
+def load_stage(stage_number):
+    global current_stage, min_world_chunks, max_world_chunks, loaded_chunks, world, player_rect, current_spritesheet, spritesheet_pool
+
+    current_stage = stage_number
+    loaded_chunks.clear() #resets chunks loaded
+
+    stage_min_chunk_x = ((stage_number-1)*stage_length) - 1
+    stage_max_chunk_x = stage_min_chunk_x + stage_length
+
+    #(-1)*(16tiles/1chunk) = minimum world_chunks
+    min_world_chunks = stage_min_chunk_x*world.chunk_pixel_w
+    max_world_chunks = (stage_max_chunk_x+1)*world.chunk_pixel_w    
+
+    if len(spritesheet_pool)>0:
+        map_index = random.randrange(len(spritesheet_pool))
+
+    #STAGE UPDATES
+
+    if stage_number == 1:
+        new_seed = random.randint(1,10000)
+        current_spritesheet = Spritesheet(spritesheet_pool[map_index])
+        spritesheet_pool.pop(map_index)
+    elif stage_number ==2:
+        new_seed = random.randint(1,10000)
+        current_spritesheet = Spritesheet(spritesheet_pool[map_index])
+        spritesheet_pool.pop(map_index)
+    else:
+        new_seed = 69420
+        current_spritesheet = Spritesheet('plague_spritesheet.png')
+
+    #reinitialise perlin
+    #Surface_Level
+    world.noise_1d = PerlinNoise(octaves=2, seed = int(new_seed))
+    #Caves
+    world.noise_2d = PerlinNoise(octaves=3, seed = int(new_seed))
+
+    #reset player to new stage
+    player.rect.x = (stage_min_chunk_x + 1)*world.chunk_pixel_w + 64
+    player.rect.y = 100
+
+
+
+
+
 
 #note for rendering: whatever is first rendered in the loop will be behind while whatever is last rendered in the loop will be in the very front
 # *--GAME LOOP--*
+load_stage(current_stage)
+
 while True: 
 
 
@@ -219,11 +228,11 @@ while True:
         if event.type == pygame.QUIT:
             pygame.quit()
             sys.exit()
-        # elif player_rect.right>total_map_w or player_rect.top <0 or player_rect.bottom> total_map_h:
+        # elif player.rect.right>total_map_w or player.rect.top <0 or player.rect.bottom> total_map_h:
         #     pygame.quit()
         #     sys.exit()
-        # elif player_rect.left <0:
-        #     player_rect.left = 1
+        # elif player.rect.left <0:
+        #     player.rect.left = 1
         
         # *--KEY DETECTION--*
 
@@ -287,7 +296,7 @@ while True:
             
 
     #chunk manager
-    position_chunk_x , position_chunk_y = world_to_chunk(player.rect.centerx, player.rect.centery)
+    position_chunk_x , position_chunk_y = world.world_to_chunk(player.rect.centerx, player.rect.centery)
     needed_chunks = set()
 
     for chunk_y in range(position_chunk_y - render_distance, position_chunk_y + render_distance + 1):
@@ -296,8 +305,8 @@ while True:
             needed_chunks.add(chunk_key)
 
             if chunk_key not in loaded_chunks:
-                raw_data = generate_chunk_data(chunk_x,chunk_y)
-                loaded_chunks[chunk_key] = TileMap(raw_data,sprites, tile_size)
+                raw_data = world.generate_chunk_data(chunk_x,chunk_y)
+                loaded_chunks[chunk_key] = TileMap(raw_data,current_spritesheet, tile_size)
 
     for chunk_key in list(loaded_chunks.keys()):
         if chunk_key not in needed_chunks:
@@ -346,6 +355,18 @@ while True:
 
             if player.movement[0] < 0:
                 player.rect.left = tile.right
+
+    #clamping
+    if player.rect.left < min_world_chunks:
+        player.rect.left = min_world_chunks
+
+    if player.rect.right > max_world_chunks:
+        player.rect.right = max_world_chunks
+
+    #next stage
+    if player.rect.right >= max_world_chunks:
+        load_stage(current_stage+1)
+        
 
 #---------------------------------------------------------------------
 
@@ -611,11 +632,8 @@ while True:
     camera_y = player.rect.centery - (base_res_y // 2)
 
      #map clamping      
-    # max_cam_x = total_map_w - base_res_x
-    # max_cam_y = total_map_h - base_res_y
-
-    # camera_x = max(0, min(camera_x, max_cam_x))
-    # camera_y = max(0, min(camera_y, max_cam_y))
+    max_camera_x = max_world_chunks - base_res_x
+    camera_x = max(min_world_chunks, min(camera_x, max_camera_x))
 
 
 
