@@ -1,11 +1,99 @@
-from sys import exit
+import json
+import os
+import subprocess
+from sys import executable, exit
 
 import pygame
 
+from settings_system import load_settings, save_settings
+
 pygame.init()
 
-# USE PYGAME WIDGETS FOR THE BRIGHTNESS SLIDER AND AUDIOS. AND A DROPDOWN MENU IN THE DISPLAY RESOLUTIONS IN THE VIDEOS SECTION
-# FOR NOW JUST USE RECTANGLES TO HAVE THEIR SPOTS AND FOR VISUAL PURPOSES
+# Save file paths
+saves_dir = os.path.join(os.getcwd(), "saves")
+os.makedirs(saves_dir, exist_ok=True)
+
+
+def save_file_path(slot_name):
+    # the slot number stays fixed even if the player renames the save
+    for slot in save_slots if "save_slots" in globals() else []:
+        if slot.get("name") == slot_name:
+            return os.path.join(saves_dir, f"slot_{slot.get('slot_index', 0)}.json")
+
+    # fallback for the very first creation
+    return os.path.join(saves_dir, f"{slot_name}.json")
+
+def save_exists(slot_name):
+    return os.path.exists(save_file_path(slot_name))
+
+
+def create_save_file(slot_name, slot_index):
+    # filename is tied to the slot, not the name the player sees
+    path = os.path.join(saves_dir, f"slot_{slot_index}.json")
+    with open(path, "w") as save_file:
+        json.dump({"name": slot_name, "slot_index": slot_index}, save_file, indent=4)
+
+def delete_save_file(slot_name):
+    save_path = save_file_path(slot_name)
+    if os.path.exists(save_path):
+        os.remove(save_path)
+
+
+def rename_save_file(old_name, new_name):
+    old_path = save_file_path(old_name)
+    if os.path.exists(old_path):
+        with open(old_path, "r") as save_file:
+            save_data = json.load(save_file)
+
+        save_data["name"] = new_name
+
+        # only change the name inside the JSON, dont rename the actual slot file
+        with open(old_path, "w") as save_file:
+            json.dump(save_data, save_file, indent=4)
+
+def delete_save_slot(slot_index):
+    """Delete a save slot: remove JSON file if it exists, mark slot as Empty."""
+    slot_name = save_slots[slot_index]["name"]
+    if save_exists(slot_name):
+        delete_save_file(slot_name)
+    save_slots[slot_index]["name"] = f"Save {slot_index + 1}"
+    save_slots[slot_index]["exists"] = False
+    save_slots[slot_index]["last_saved"] = None
+
+
+def sync_save_slots_with_files():
+    """Sync save_slots with existing JSON files on startup."""
+    for index, slot in enumerate(save_slots):
+        slot["name"] = f"Save {index + 1}"
+        slot["exists"] = False
+
+    for filename in os.listdir(saves_dir):
+        if not filename.endswith(".json"):
+            continue
+
+        save_path = os.path.join(saves_dir, filename)
+
+        try:
+            with open(save_path, "r") as save_file:
+                save_data = json.load(save_file)
+        except (OSError, json.JSONDecodeError):
+            continue
+
+        slot_index = save_data.get("slot_index")
+
+        if not isinstance(slot_index, int) or isinstance(slot_index, bool):
+            save_name = os.path.splitext(filename)[0]
+
+            if save_name.startswith("Save ") and save_name[-1:].isdigit():
+                slot_index = int(save_name[-1:]) - 1
+            else:
+                continue
+
+        if not 0 <= slot_index < len(save_slots):
+            continue
+
+        save_slots[slot_index]["name"] = save_data.get("name", f"Save {slot_index + 1}")
+        save_slots[slot_index]["exists"] = True
 
 
 # resolution
@@ -94,6 +182,9 @@ save_slots = [
     }
 ]
 
+# Sync save slots with existing JSON files on startup
+sync_save_slots_with_files()
+
 selected_save = None
 renaming_save = False
 rename_text = ""
@@ -104,6 +195,11 @@ message = ""
 selected = 0
 current_state = "MAIN"
 
+# Slider dragging state
+drag = False
+dragging_slider = None
+rebinding_control = None
+
 # Options menu state
 selected_option = None
 dropdown_open = False
@@ -113,13 +209,74 @@ resolution_options = [
     (1920, 1080)
 ]
 selected_resolution = 1
-brightness = 100
 fullscreen = False
 
 # Audio values (0 - 100)
 master_volume = 100
 music_volume = 80
 sfx_volume = 100
+
+# Controls shared with the game
+controls = {
+    "up": "W",
+    "left": "A",
+    "down": "S",
+    "right": "D",
+    "jump": "Space"
+}
+
+# Brightness value
+brightness = 50
+
+# Load the settings saved from previous sessions.
+settings = load_settings()
+selected_resolution = settings["resolution_index"]
+fullscreen = settings["fullscreen"]
+brightness = settings["brightness"]
+master_volume = settings["master_volume"]
+music_volume = settings["music_volume"]
+sfx_volume = settings["sfx_volume"]
+controls.update(settings.get("controls", {}))
+
+window_w, window_h = resolution_options[selected_resolution]
+
+if fullscreen:
+    status = pygame.FULLSCREEN
+    screen_state_w, screen_state_h = display_w, display_h
+else:
+    status = pygame.RESIZABLE
+    screen_state_w, screen_state_h = window_w, window_h
+
+screen = pygame.display.set_mode((screen_state_w, screen_state_h), status)
+
+
+def update_settings_file():
+    save_settings({
+        "resolution_index": selected_resolution,
+        "fullscreen": fullscreen,
+        "brightness": brightness,
+        "master_volume": master_volume,
+        "music_volume": music_volume,
+        "sfx_volume": sfx_volume,
+        "controls": controls
+    })
+
+
+def open_save(slot_index):
+    slot_name = save_slots[slot_index]["name"]
+
+    if not save_exists(slot_name):
+        create_save_file(slot_name, slot_index)
+        save_slots[slot_index]["exists"] = True
+
+    update_settings_file()
+
+    subprocess.Popen(
+        [executable, "main.py", "--save-slot", str(slot_index)]
+    )
+
+    pygame.quit()
+    exit()
 
 
 def save_rename():
@@ -142,7 +299,14 @@ def save_rename():
             message = "Name Already In Use."
             return False
 
+    # Rename the JSON file if it exists
+    if save_exists(old_name):
+        rename_save_file(old_name, new_name)
+
+    # Indicator for the save slot "Exists" or "None"
     save_slots[selected_save]["name"] = new_name
+    # Syncs "exists" indicator with file existence after rename
+    save_slots[selected_save]["exists"] = save_exists(new_name)
     message = ""
 
     return True
@@ -152,6 +316,15 @@ def save_rename():
 while True:
 
     canvas.fill((15, 15, 20))
+
+    # Show brightness changes on the menu background in real time.
+    if brightness < 50:
+        background_factor = 0.65 + (brightness / 50.0) * 0.35
+        background_value = int(15 * background_factor)
+        canvas.fill((background_value, background_value, background_value))
+    elif brightness > 50:
+        background_value = int((brightness - 50) / 50.0 * 80)
+        canvas.fill((background_value, background_value, background_value))
 
     # main menu
     if current_state == "MAIN":
@@ -408,7 +581,7 @@ while True:
             (240, 240, 240)
         )
         back_rect = back_text.get_rect(
-            center=(base_res_x / 2, 330)
+            center=(base_res_x / 2, 315)
         )
 
         mouse_x = pygame.mouse.get_pos()[0] * base_res_x / screen_state_w
@@ -513,12 +686,12 @@ while True:
             (240, 240, 240)
         )
         bright_label_rect = bright_label.get_rect(
-            midleft=(panel_rect.left + 25, 225)
+            midleft=(panel_rect.left + 25, 250)
         )
         canvas.blit(bright_label, bright_label_rect)
 
         slider_x = 270
-        slider_y = 218
+        slider_y = 243
         slider_width = 220
 
         pygame.draw.rect(
@@ -629,15 +802,15 @@ while True:
             2
         )
 
-        controls = [
-            ("Move Up", "W"),
-            ("Move Left", "A"),
-            ("Move Down", "S"),
-            ("Move Right", "D"),
-            ("Jump", "Space")
+        control_rows = [
+            ("Move Up", controls["up"]),
+            ("Move Left", controls["left"]),
+            ("Move Down", controls["down"]),
+            ("Move Right", controls["right"]),
+            ("Jump", controls["jump"])
         ]
 
-        for index, (action, key) in enumerate(controls):
+        for index, (action, key) in enumerate(control_rows):
 
             row_y = 118 + (index * 31)
 
@@ -650,6 +823,9 @@ while True:
                 midleft=(panel_rect.left + 25, row_y)
             )
             canvas.blit(action_text, action_rect)
+
+            if rebinding_control == ["up", "left", "down", "right", "jump"][index]:
+                key = "Press a key..."
 
             key_text = font_section.render(
                 key,
@@ -722,8 +898,9 @@ while True:
             ("SFX Volume", sfx_volume)
         ]
 
-        slider_x = 255
-        slider_width = 250
+        # Keep the sliders far enough to the right so the labels do not overlap them.
+        slider_x = 330
+        slider_width = 190
 
         for index, (label, value) in enumerate(audio_settings):
 
@@ -773,7 +950,7 @@ while True:
             (240, 240, 240)
         )
         back_rect = back_text.get_rect(
-            center=(base_res_x / 2, 330)
+            center=(base_res_x / 2, 315)
         )
 
         mouse_x = pygame.mouse.get_pos()[0] * base_res_x / screen_state_w
@@ -816,6 +993,12 @@ while True:
 
         # keyboard
         elif event.type == pygame.KEYDOWN:
+
+            if rebinding_control is not None:
+                controls[rebinding_control] = pygame.key.name(event.key).title()
+                rebinding_control = None
+                update_settings_file()
+                continue
 
             # window controls
             if event.key == pygame.K_F1:
@@ -879,7 +1062,6 @@ while True:
                 mouse_y = event.pos[1] * base_res_y / screen_state_h
 
                 mouse_pos = (mouse_x, mouse_y)
-
 
                 if current_state == "MAIN":
 
@@ -983,10 +1165,7 @@ while True:
 
                                 else:
 
-                                    print(
-                                        "OPEN SAVE:",
-                                        save_slots[index]["name"]
-                                    )
+                                    open_save(index)
 
 
                             # clicked another save
@@ -1099,7 +1278,7 @@ while True:
 
                             dropdown_rect = pygame.Rect(
                                 270,
-                                148 + (index * 30),
+                                145 + (index * 30),
                                 245,
                                 30
                             )
@@ -1107,6 +1286,25 @@ while True:
                             if dropdown_rect.collidepoint(mouse_pos):
                                 selected_resolution = index
                                 dropdown_open = False
+                                update_settings_file()
+                                
+                                # Get the selected (width, height) from resolution_options using selected_resolution
+                                selected_width, selected_height = resolution_options[selected_resolution]
+                                
+                                # Set the existing window_w and window_h variables to that width and height
+                                window_w = selected_width
+                                window_h = selected_height
+                                
+                                # Only update the active window when in windowed mode
+                                if status == pygame.RESIZABLE:
+                                    screen_state_w = window_w
+                                    screen_state_h = window_h
+                                    
+                                    screen = pygame.display.set_mode(
+                                        (screen_state_w, screen_state_h),
+                                        status
+                                    )
+                                
                                 break
 
                     # Fullscreen toggle
@@ -1120,6 +1318,7 @@ while True:
                     if fullscreen_rect.collidepoint(mouse_pos):
 
                         fullscreen = not fullscreen
+                        update_settings_file()
 
                         if fullscreen:
                             status = pygame.FULLSCREEN
@@ -1144,16 +1343,19 @@ while True:
                     # Brightness slider
                     brightness_slider_rect = pygame.Rect(
                         270,
-                        210,
+                        241,
                         220,
-                        30
+                        18
                     )
 
                     if brightness_slider_rect.collidepoint(mouse_pos):
+                        drag = True
+                        dragging_slider = "brightness"
                         brightness = int(
                             (mouse_x - 270) / 220 * 100
                         )
                         brightness = max(0, min(100, brightness))
+                        update_settings_file()
 
 
                 elif current_state == "CONTROLS":
@@ -1167,6 +1369,21 @@ while True:
 
                     if back_rect.collidepoint(mouse_pos):
                         current_state = "OPTIONS"
+                        rebinding_control = None
+
+                    control_rows = [
+                        ("up", 118),
+                        ("left", 149),
+                        ("down", 180),
+                        ("right", 211),
+                        ("jump", 242)
+                    ]
+
+                    for control_name, row_y in control_rows:
+                        control_rect = pygame.Rect(80, row_y - 15, 480, 30)
+                        if control_rect.collidepoint(mouse_pos):
+                            rebinding_control = control_name
+                            break
 
 
                 elif current_state == "AUDIO":
@@ -1180,7 +1397,6 @@ while True:
 
                     if back_rect.collidepoint(mouse_pos):
                         current_state = "OPTIONS"
-                        
 
                     # Audio slider hitboxes
                     audio_sliders = [
@@ -1192,16 +1408,18 @@ while True:
                     for slider_name, slider_y in audio_sliders:
 
                         slider_rect = pygame.Rect(
-                            255,
-                            slider_y - 15,
-                            250,
-                            30
+                            330,
+                            slider_y - 9,
+                            190,
+                            18
                         )
 
                         if slider_rect.collidepoint(mouse_pos):
+                            drag = True
+                            dragging_slider = slider_name
 
                             value = int(
-                                (mouse_x - 255) / 250 * 100
+                                (mouse_x - 330) / 190 * 100
                             )
                             value = max(0, min(100, value))
 
@@ -1211,6 +1429,46 @@ while True:
                                 music_volume = value
                             elif slider_name == "sfx":
                                 sfx_volume = value
+
+                            update_settings_file()
+                            break
+
+    # Continuous slider dragging
+    if drag:
+
+        if pygame.mouse.get_pressed()[0]:
+
+            mouse_x = pygame.mouse.get_pos()[0] * base_res_x / screen_state_w
+
+            if dragging_slider == "brightness" and current_state == "VIDEO":
+                brightness = int(
+                    (mouse_x - 270) / 220 * 100
+                )
+                brightness = max(0, min(100, brightness))
+
+            elif dragging_slider == "master" and current_state == "AUDIO":
+                master_volume = int(
+                    (mouse_x - 330) / 190 * 100
+                )
+                master_volume = max(0, min(100, master_volume))
+
+            elif dragging_slider == "music" and current_state == "AUDIO":
+                music_volume = int(
+                    (mouse_x - 330) / 190 * 100
+                )
+                music_volume = max(0, min(100, music_volume))
+
+            elif dragging_slider == "sfx" and current_state == "AUDIO":
+                sfx_volume = int(
+                    (mouse_x - 330) / 190 * 100
+                )
+                sfx_volume = max(0, min(100, sfx_volume))
+
+            update_settings_file()
+
+        else:
+            drag = False
+            dragging_slider = None
 
     # scale the canvas to the current window size
     scaled_resolution = pygame.transform.scale(
