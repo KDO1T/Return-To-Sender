@@ -86,11 +86,12 @@ zombies = []
 
 class Zombie:
 
-    def __init__(self, rect, movement, x_momentum, y_momentum, x_flip, render_pos, on_ground, idle_move, chase_player, chase_speed ,
+    def __init__(self, rect, movement, x_push_momentum, y_push_momentum, y_momentum, x_flip, render_pos, on_ground, idle_move, chase_player, chase_speed ,
                  attack_count, knocked, damaged, staggered,stag_count,max_stag_count, HP, ATK):
         self.rect = rect
         self.movement = movement
-        self.x_momentum = x_momentum
+        self.x_push_momentum = x_push_momentum
+        self.y_push_momentum = y_push_momentum
         self.y_momentum = y_momentum
         self.x_flip = x_flip
         self.render_pos = render_pos
@@ -109,6 +110,7 @@ class Zombie:
 
 
 
+
     def generate_rect(self, i, player_current_chunk_x):
         self.rect = pygame.Rect(((player_current_chunk_x + 640) + (i*30)), 50, 20,32)
 
@@ -117,7 +119,7 @@ class Zombie:
         x_distance = abs(self.render_pos[0] - player_position[0])
         y_distance = abs(self.render_pos[1] - player_position[1])
 
-        if x_distance <=128 and y_distance <= 128:
+        if x_distance <=256 and y_distance <= 128:
             self.chase_player = True 
         else:
             self.chase_player = False
@@ -139,31 +141,59 @@ class Zombie:
     def receive_damage(self, player_damage):
         if self.damaged == True:
             self.HP -= player_damage
+            print('you hurt me bruh')
             self.damaged = False
             self.staggered = True
             self.knocked = True
             print(self.HP)
 
+    def dead_check(self, zomb_index):
+        if self.HP <= 0:
+            return zomb_index
 
-    def receive_knockback(self, player_force, player_direction):
+
+
+    def calculate_knockback(self, player_force, player_direction, player_rect ):
         if self.knocked == True:
-
             if player_direction == False: #facing right
-                self.x_momentum += player_force
-                self.y_momentum += -player_force//10
+                self.rect.left = player_rect.right
+                self.x_push_momentum += player_force//3
+                self.y_push_momentum += -player_force//5
 
             if player_direction == True: #facing left
-                self.x_momentum -= player_force
-                self.y_momentum += -player_force//10
+                self.rect.right = player_rect.left
+                self.x_push_momentum -= player_force//3
+                self.y_push_momentum += -player_force//5
 
             self.knocked = False
-            print('i got knocked')
+
+
+
+        pass
+
+    
+        # if self.knocked == True:
+    
+        #     if player_direction == False: #facing right
+        #         self.rect.left = player_rect.right
+        #         self.x_momentum += player_force//2
+        #         self.y_momentum += -player_force//10
+
+        #     if player_direction == True: #facing left
+        #         self.rect.right = player_rect.left
+        #         self.x_momentum -= player_force//2
+        #         self.y_momentum += -player_force//10
+
+            
+            
+        #     self.knocked = False #put this into Y knockback code
+        #     print('i got knocked')
 
     def check_staggered(self):
         if self.staggered is True:
             self.stag_count += 1
 
-        if self.stag_count == self.max_stag_count: #staggered for how long the zombie should be staggered for (base duration is 30 aka 0.5 sec)
+        if self.stag_count >= self.max_stag_count: #staggered for how long the zombie should be staggered for (base duration is 45 aka 3/4 sec)
             self.staggered = False
             self.stag_count = 0
     

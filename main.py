@@ -278,7 +278,7 @@ while True:
     if len(zombies) < zombie_count:
 
         for i in range(zombie_count):
-            zombie = Zombie(None, [0,0],0,0, False, (0,0), None, '',None, 0, 0, False, False, False,0,30,50, 5)
+            zombie = Zombie(None, [0,0],0,0,0, False, (0,0), None, '',None, 0, 0, False, False, False,0,30,50, 5)
             zombie.generate_rect(i, position_chunk_x)
             zombies.append(zombie)
             zombie.chase_speed = random.randint(1,3)
@@ -365,11 +365,19 @@ while True:
 #------------------------------------PLAYER ZOMBIE INTERACTION---------------------------------------------------
 
     #PLAYER ATTACKING ZOMBIES
+    zomb_no = 0
+    del_zomb = None
     for zombie in zombies:
         zombie.damaged = player.attack(zombie.rect, zombie.damaged)
         zombie.receive_damage(player.ATK)
-        zombie.receive_knockback(player.mom_force, player.x_flip)
+        zombie.calculate_knockback(player.mom_force, player.x_flip, player.rect)
         zombie.check_staggered()
+        del_zomb = zombie.dead_check(zomb_no)
+        if del_zomb is not None:
+            zombies.pop(del_zomb)
+        zomb_no += 1
+        
+
 
     #ZOMBIES ATTACKING PLAYER
     for zombie in zombies:
@@ -412,54 +420,66 @@ while True:
     
 
     
-    for zombie in zombies: #freezes movement horizontal movement if zombie isn't in frame
-        if zombie.render_pos[0] < position_chunk_x:
+    for zombie in zombies: 
+        if zombie.render_pos[0] < position_chunk_x:#freezes movement horizontal movement if zombie isn't in frame
             zombie.idle_move = 'Still'
-        
+
         zombie.movement = [0,0]
 
-        if zombie.staggered == False: #if zombie is not staggered
-            if zombie.chase_player == True: #chase player
+        if abs(zombie.x_push_momentum) > 0:#if there is any X_knockback applied to zombie then apply it
 
-                try:
-                    if zombie.render_pos > player_render_pos:
-                        zombie.movement[0] = -zombie.chase_speed
+            zombie.x_push_momentum *= 0.85
+            
+            if abs(zombie.x_push_momentum) < 0.1: #if its near 0, its negligible so make it zero
+                zombie.x_push_momentum = 0 
+            else:
+                zombie.movement[0] = zombie.x_push_momentum
+                zombie.rect.x += zombie.movement[0]
+
+        else:
+
+
+            if zombie.staggered == False: #if zombie is not staggered
+                if zombie.chase_player == True: #chase player
+
+                    try:
+                        if zombie.render_pos > player_render_pos:
+                            zombie.movement[0] = -zombie.chase_speed
+                            zombie.rect.x += zombie.movement[0]
+
+                        if zombie.render_pos < player_render_pos:
+                            zombie.movement[0] = zombie.chase_speed
+                            zombie.rect.x += zombie.movement[0]
+                            
+                    except NameError:
+                        pass
+
+
+
+                else: #idle movement
+
+                    speed_pool = [1, 2, 3]
+                    speed_weightage = [70,25,5]
+                    random_zomb_speed = random.choices(speed_pool, weights=speed_weightage, k=1)[0]    
+                    
+                    #move right
+                    if zombie.idle_move == 'Right':
+                        zombie.movement[0] = random_zomb_speed
                         zombie.rect.x += zombie.movement[0]
 
-                    if zombie.render_pos < player_render_pos:
-                        zombie.movement[0] = zombie.chase_speed
+                    #move left
+                    if zombie.idle_move == 'Left':
+                        zombie.movement[0] = -random_zomb_speed
                         zombie.rect.x += zombie.movement[0]
-                        
-                except NameError:
-                    pass
 
-
-
-            else: #idle movement
-
-                speed_pool = [1, 2, 3]
-                speed_weightage = [70,25,5]
-                random_zomb_speed = random.choices(speed_pool, weights=speed_weightage, k=1)[0]    
-                
-                #move right
-                if zombie.idle_move == 'Right':
-                    zombie.movement[0] = random_zomb_speed
-                    zombie.rect.x += zombie.movement[0]
-
-                #move left
-                if zombie.idle_move == 'Left':
-                    zombie.movement[0] = -random_zomb_speed
-                    zombie.rect.x += zombie.movement[0]
-
-                #dont move
-                if zombie.idle_move == 'Still':
-                    pass
-        else: #if zombie is staggered
-            zombie.movement = [0,0]
+                    #dont move
+                    if zombie.idle_move == 'Still':
+                        pass
+            else: #if zombie is staggered
+                zombie.movement = [0,0]
             
     #HORIZONTAL KNOCKBACK CODE
 
-    #blahblahblah
 
 
     #ZOMBIE HORIZONTAL COLLISIONS
@@ -477,6 +497,18 @@ while True:
 
 
     for zombie in zombies:
+
+        if abs(zombie.y_push_momentum) > 0: #if there is any Y_knockback applied to zombie then apply it
+
+            zombie.y_push_momentum *= 0.85
+            
+            if abs(zombie.y_push_momentum) < 0.1: #if its near 0, its negligible so make it zero
+                zombie.y_push_momentum = 0 
+            else:
+                zombie.movement[1] = zombie.y_push_momentum
+                zombie.rect.y += zombie.movement[1]
+
+
         zombie.movement[1] = zombie.y_momentum
         zombie.y_momentum += 0.2
         if zombie.y_momentum > 4.5:
@@ -491,6 +523,8 @@ while True:
         zombie.rect.y += zombie.movement[1]
 
 
+
+        
         for tile in tile_rect:
             if zombie.rect.colliderect(tile):
                 if zombie.movement[1] > 0:
