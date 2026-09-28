@@ -45,7 +45,7 @@ chunk_pixel_h = chunk_tiles_y*tile_size
 
 render_distance = 2
 loaded_chunks = {}
-set_seed = 1234
+set_seed = 123456
 
 #Surface_Level
 noise_1d = PerlinNoise(octaves=2, seed = int(set_seed))
