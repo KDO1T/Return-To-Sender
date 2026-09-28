@@ -6,7 +6,8 @@ class Player:
     #level is the player's level, while exp is what the player gains to increase in level
     #dollars is the money the player gains throughout runs while s_coin (soul coins) is the metacurrency
     def __init__(self, Name,rect,movement,moving_up,moving_down ,moving_right ,moving_left, press_space, y_momentum,max_air_jumps,jump,on_ground,x_flip,
-                 all_frames ,current_frames ,frame_index, animation_mode, animation_count, HP, ATK,attacked, CRIT_DMG, CRIT_CHANCE, LEVEL, EXP, DOLLARS, S_COIN):
+                 all_frames ,current_frames ,frame_index, animation_mode, animation_count,max_HP, damaged,base_ATK,attacking,attack_dir, first_hit_count,
+                 combo_tick,combo_stage, combo_cooldown, combo_window, max_combo_window, first_hit_cooldown, attacked, CRIT_DMG, CRIT_CHANCE, LEVEL, EXP, DOLLARS, S_COIN):
         self.Name = Name
         self.rect = rect
         self.movement = movement
@@ -26,9 +27,20 @@ class Player:
         self.frame_index = frame_index
         self.animation_mode = animation_mode
         self.animation_count = animation_count
-        self.HP = HP
-        self.ATK = ATK
-        self.mom_force = ATK*5 #the momentum the player applies to zombies when knocking them back
+        self.max_HP = max_HP
+        self.HP = max_HP
+        self.damaged = damaged
+        self.base_ATK = base_ATK
+        self.attack_dir = attack_dir
+        self.first_hit_count = first_hit_count #the time starting from when the player isnt attacking anything
+        self.combo_tick = combo_tick #the time between each hit and use this to check if you should continue the combo or not
+        self.combo_stage = combo_stage #which hit the player is in their combo
+        self.first_hit_cooldown = first_hit_cooldown #self explanatory
+        self.combo_cooldown = combo_cooldown # <-- This should always be less than the first_hit_cooldown to incentivize the player to not spam and hold the button
+        self.combo_window = combo_window #the time between each hit of a combo
+        self.max_combo_window = max_combo_window 
+        self.mom_force = 5 #the momentum the player applies to zombies when knocking them back
+        self.attacking = attacking
         self.attacked = attacked
         self.CRIT_DMG = CRIT_DMG
         self.CRIT_CHANCE = CRIT_CHANCE
@@ -73,12 +85,72 @@ class Player:
 
         return self.animation_count, self.frame_index
 
-    def attack(self, zombie_hitbox,zombie_damaged):
-        if self.attacked == True:
+
+
+    def check_cooldown(self):
+
+
+        if self.combo_window > 0: #if player hasn't executed the next move in the combo, it will minus 1 from the frames in the 'window' of the move
+            self.combo_window -= 1 
+            if self.combo_window == 0:
+                self.combo_stage = 0
+                print('combo expired bru')
+
+
+        if self.attacking is True and self.attacked is False: #if this is the player first hit 
+            if self.combo_tick < self.combo_cooldown:
+                self.combo_tick = self.combo_cooldown #makes sure the first hit is instant
+                self.combo_tick += 1
+                
+            print('first hit')
+
+        elif self.attacking is True and self.attacked is True: #if player is attacking and has already attacked previously, just add do the counter normally
+            self.combo_tick += 1
+
+        if self.attacked is True and self.attacking is False: #resets first hit cooldown when they have previously attacked 
+            self.first_hit_count += 1                         #and they are not currently attacking
+            if self.first_hit_count >= self.first_hit_cooldown:
+                self.attacked = False
+                self.first_hit_count = 0
+                self.combo_stage = 0
+            else:
+                self.first_hit_count += 1
+
+
+    def attack(self,zombie_damaged, zombie_hitbox, player_damage):
+        if self.combo_tick >= self.combo_cooldown:
             if self.rect.colliderect(zombie_hitbox):
+                print('TAKE THAT')
+
+                if self.combo_stage < 5: #if it isn't the 5th stage, add one more stage to the combo
+                    self.combo_stage += 1
+                else:
+                    self.combo_stage = 1 #if it's more than 5 than revert back to stage 1
+
+                player_damage = self.base_ATK*(self.combo_stage/5)
+                print(f'damaged for {player_damage}!')
                 zombie_damaged = True
+                self.attacked = True
+                self.combo_tick = 0
+
+                self.combo_window = self.max_combo_window
+            
+
+        return zombie_damaged, player_damage
+
+
+    def receive_damage(self, zombie_damage):
+        if self.damaged is True:
+            self.HP -= zombie_damage
+            self.damaged = False
+
+            print(f'i have been hit by this filthy zombie for {zombie_damage} and now im {self.HP}. my maxHP is {self.max_HP}')
+
+
         
-            return zombie_damaged
+
+
+            
         
     
 zombies = []
@@ -130,22 +202,22 @@ class Zombie:
         if self.rect.colliderect(player_hitbox):
             self.attack_count += 1
 
-    def attack_player(self): #add player hp in paranthesis
+    def attack_player(self, player_damaged): #add player hp in paranthesis
         if self.attack_count >= 60:         
-            print('i touched you')
+            player_damaged = True
             self.attack_count = 0
 
+            return player_damaged
 
 
 
     def receive_damage(self, player_damage):
         if self.damaged == True:
             self.HP -= player_damage
-            print('you hurt me bruh')
+            print(f'you hurt me bruh, im now {self.HP}')
             self.damaged = False
             self.staggered = True
             self.knocked = True
-            print(self.HP)
 
     def dead_check(self, zomb_index):
         if self.HP <= 0:

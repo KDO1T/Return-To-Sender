@@ -119,9 +119,19 @@ player = Player(
     current_frames = [],
     frame_index = 0,
     animation_mode = 0,
-    animation_count = 0,
-    HP=100,    
-    ATK=5, 
+    animation_count = 0,    
+    max_HP = 50,
+    damaged=False,
+    base_ATK=5, 
+    attack_dir = None,
+    first_hit_count = 0,
+    combo_tick = 0,
+    combo_stage = 0,
+    first_hit_cooldown = 120,
+    combo_cooldown = 20,
+    combo_window = 0,
+    max_combo_window = 25,
+    attacking = False,
     attacked = False,
     CRIT_DMG=None, 
     CRIT_CHANCE=None, 
@@ -181,7 +191,6 @@ while True:
 
 
     player.jump = False #resets jump
-    player.attacked = False #resets player attack
 
 
 
@@ -203,11 +212,18 @@ while True:
         # *--KEY DETECTION--*
 
         # *--WINDOW CONTROLS--*
-        if event.type == VIDEORESIZE and status == RESIZABLE:
-                            window_w, window_h = event.w , event.h
-                            screen_state_w, screen_state_h = window_w, window_h
-                            screen = pygame.display.set_mode((screen_state_w, screen_state_h),status)
 
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            player.attacking = True
+        if event.type == pygame.MOUSEBUTTONUP:
+            player.attacking = False
+
+        if event.type == VIDEORESIZE and status == RESIZABLE:
+            window_w, window_h = event.w , event.h
+            screen_state_w, screen_state_h = window_w, window_h
+            screen = pygame.display.set_mode((screen_state_w, screen_state_h),status)
+
+        
         if event.type == KEYDOWN:
             if event.key == K_F1:
                 status = RESIZABLE
@@ -228,8 +244,7 @@ while True:
                 player.moving_left = True
             if event.key == pygame.K_SPACE:
                 player.press_space = True
-            if event.key == pygame.K_f:
-                player.attacked = True
+        
 
 
             # *--KEY IS LET GO--*  
@@ -245,6 +260,7 @@ while True:
                 player.moving_right = False
             if event.key == pygame.K_a: #let go of A (left)
                 player.moving_left = False
+            
 
     #chunk manager
     position_chunk_x , position_chunk_y = world_to_chunk(player.rect.centerx, player.rect.centery)
@@ -273,12 +289,12 @@ while True:
 
     #Generating Zombies:
 
-    zombie_count = 5
+    zombie_count = 1
 
     if len(zombies) < zombie_count:
 
         for i in range(zombie_count):
-            zombie = Zombie(None, [0,0],0,0,0, False, (0,0), None, '',None, 0, 0, False, False, False,0,30,50, 5)
+            zombie = Zombie(None, [0,0],0,0,0, False, (0,0), None, '',None, 0, 0, False, False, False,0,45,100, 5)
             zombie.generate_rect(i, position_chunk_x)
             zombies.append(zombie)
             zombie.chase_speed = random.randint(1,3)
@@ -360,29 +376,34 @@ while True:
     player.press_space = False #just returns it back to the original state so it doesn't infintely jump
 
     if player.jump == True:
-        player.y_momentum = -4.5
+        player.y_momentum = -3
 
-#------------------------------------PLAYER ZOMBIE INTERACTION---------------------------------------------------
+#------------------------------------PLAYER ZOMBIE INTERACTION---------------------------------------------------d
 
     #PLAYER ATTACKING ZOMBIES
     zomb_no = 0
     del_zomb = None
+    player_damage = 0
+    player.check_cooldown()
     for zombie in zombies:
-        zombie.damaged = player.attack(zombie.rect, zombie.damaged)
-        zombie.receive_damage(player.ATK)
+        zombie.damaged, applied_damage = player.attack(zombie.damaged, zombie.rect, player_damage)
+        zombie.receive_damage(applied_damage)
         zombie.calculate_knockback(player.mom_force, player.x_flip, player.rect)
         zombie.check_staggered()
         del_zomb = zombie.dead_check(zomb_no)
         if del_zomb is not None:
             zombies.pop(del_zomb)
         zomb_no += 1
+
         
 
 
     #ZOMBIES ATTACKING PLAYER
     for zombie in zombies:
         zombie.touch_player(player.rect)
-        zombie.attack_player()
+        if zombie.staggered == False:
+            player.damaged = zombie.attack_player(player.HP)
+        player.receive_damage(zombie.ATK)
 
     
     
