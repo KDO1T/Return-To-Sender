@@ -1,5 +1,6 @@
 import random
 import sys
+import subprocess
 
 import pygame
 from perlin_noise import PerlinNoise
@@ -8,14 +9,20 @@ from pygame.locals import *
 from player import Player, Player_Sprite
 from spritesheet import Spritesheet
 from tilemap import *
+from save_system import save_game, load_game
+from settings_system import load_settings, save_settings
 
-# Safely get the brightness argument, default to 0, and keep it between 0 and 100.
-brightness = 0
+# Safely get the brightness argument, default to 50, and keep it between 0 and 100.
+brightness = 50
 if "--brightness" in sys.argv:
     brightness = int(sys.argv[sys.argv.index("--brightness") + 1])
     brightness = max(0, min(100, brightness))
 
-# Brightness
+save_slot = 0
+if "--save-slot" in sys.argv:
+    save_slot = int(sys.argv[sys.argv.index("--save-slot") + 1])
+
+# Actual Brightness Calculations
 def create_brightness_surface(value):
     # 0 = 65% brightness, 50 = 100%, 100 = 125%.
     brightness_surface = pygame.Surface((base_res_x, base_res_y))
@@ -43,13 +50,42 @@ display_w , display_h = resolution[0]   #index 0 for the first monitor
 window_w, window_h = 1280,720
 screen_state_w, screen_state_h = window_w, window_h
 
+# Load the same settings used by the main menu.
+settings = load_settings()
+resolution_options = [
+    (640, 360),
+    (1280, 720),
+    (1920, 1080)
+]
+selected_resolution = max(0, min(len(resolution_options) - 1, settings["resolution_index"]))
+window_w, window_h = resolution_options[selected_resolution]
+fullscreen = settings["fullscreen"]
+brightness = settings["brightness"]
+master_volume = settings["master_volume"]
+music_volume = settings["music_volume"]
+sfx_volume = settings["sfx_volume"]
+controls = settings.get("controls", {})
+
+if fullscreen:
+    status = FULLSCREEN
+    screen_state_w, screen_state_h = display_w, display_h
+else:
+    status = RESIZABLE
+    screen_state_w, screen_state_h = window_w, window_h
+
+control_keys = {
+    "up": pygame.key.key_code(controls.get("up", "W").lower()),
+    "left": pygame.key.key_code(controls.get("left", "A").lower()),
+    "down": pygame.key.key_code(controls.get("down", "S").lower()),
+    "right": pygame.key.key_code(controls.get("right", "D").lower()),
+    "jump": pygame.key.key_code(controls.get("jump", "Space").lower())
+}
+
 #camera movement
 camera_x=0 #made it the same as the player's coordinates
 camera_y=0 #made it the same as the player's coordinates
 camera_speed=5 #will make this the difference in current player coordinates 
 
-#base window status
-status = RESIZABLE
 
 #1. initiliaze pygame, 2. names the window, 3. sets the window size and sets its paramaters
 pygame.display.set_caption("Return To Sender") 
@@ -60,6 +96,11 @@ brightness_surface = create_brightness_surface(brightness)
 
 
 clock = pygame.time.Clock() #assigning the clock function to a variable to use for the fps in the gameloop
+
+# pause menu fonts
+font_pause_title = pygame.font.Font("fonts/Press_Start_2P/PressStart2P.ttf", 24)
+font_pause = pygame.font.Font("fonts/VT323/VT323.ttf", 34)
+font_pause_small = pygame.font.Font("fonts/VT323/VT323.ttf", 26)
 
 # *-- MAP STUFF --*
 sprites = Spritesheet('spritesheet.png')
@@ -269,6 +310,40 @@ def update_player_frame (mod, frame, tick): #math for frame
 player_rect = pygame.Rect(100, 200, 32, 32) #player hitbox
 #                                   ^^  ^^ change this number to alter player hitbox
 
+# Pause menu state
+paused = False
+pause_state = "PAUSE"
+pause_options_state = "MAIN"
+pause_dragging_slider = None
+pause_dropdown_open = False
+pause_rebinding_control = None
+
+# Load the player's saved progress. Global settings such as brightness are
+# kept separate from the save slot so the same settings are used everywhere.
+load_game(save_slot, player, player_rect, brightness)
+brightness_surface = create_brightness_surface(brightness)
+
+
+def update_settings_file():
+    save_settings({
+        "resolution_index": selected_resolution,
+        "fullscreen": fullscreen,
+        "brightness": brightness,
+        "master_volume": master_volume,
+        "music_volume": music_volume,
+        "sfx_volume": sfx_volume,
+        "controls": controls
+    })
+
+
+def apply_audio_settings():
+    # The project can use these values when mixer audio is added.
+    if pygame.mixer.get_init():
+        pygame.mixer.music.set_volume((master_volume / 100) * (music_volume / 100))
+
+
+apply_audio_settings()
+
 
 
 #note for rendering: whatever is first rendered in the loop will be behind while whatever is last rendered in the loop will be in the very front
@@ -289,14 +364,189 @@ while True:
 
         # *--QUIT--*
         if event.type == pygame.QUIT:
+            update_settings_file()
+            save_game(save_slot, player, player_rect, brightness)
             pygame.quit()
             sys.exit()
+
+        if event.type == pygame.KEYDOWN and pause_rebinding_control is not None and paused and pause_state == "OPTIONS" and pause_options_state == "CONTROLS":
+            controls[pause_rebinding_control] = pygame.key.name(event.key).title()
+            control_keys[pause_rebinding_control] = event.key
+            pause_rebinding_control = None
+            update_settings_file()
+            continue
+
+        # ESC opens/closes the pause menu.
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            if pause_state == "OPTIONS":
+                if pause_options_state != "MAIN":
+                    pause_options_state = "MAIN"
+                else:
+                    pause_state = "PAUSE"
+            else:
+                paused = not paused
+            continue
+
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_F5:
+            update_settings_file()
+            save_game(save_slot, player, player_rect, brightness)
         # elif player_rect.right>total_map_w or player_rect.top <0 or player_rect.bottom> total_map_h:
         #     pygame.quit()
         #     sys.exit()
         # elif player_rect.left <0:
         #     player_rect.left = 1
         
+        # Pause menu mouse controls
+        if paused:
+            mouse_x = event.pos[0] * base_res_x / screen_state_w if hasattr(event, "pos") else 0
+            mouse_y = event.pos[1] * base_res_y / screen_state_h if hasattr(event, "pos") else 0
+
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if pause_state == "PAUSE":
+                    pause_buttons = [
+                        pygame.Rect(220, 105, 200, 38),
+                        pygame.Rect(220, 150, 200, 38),
+                        pygame.Rect(220, 195, 200, 38),
+                        pygame.Rect(220, 240, 200, 38)
+                    ]
+
+                    if pause_buttons[0].collidepoint(mouse_x, mouse_y):
+                        paused = False
+                    elif pause_buttons[1].collidepoint(mouse_x, mouse_y):
+                        pause_state = "OPTIONS"
+                        pause_options_state = "MAIN"
+                    elif pause_buttons[2].collidepoint(mouse_x, mouse_y):
+                        update_settings_file()
+                        save_game(save_slot, player, player_rect, brightness)
+                    elif pause_buttons[3].collidepoint(mouse_x, mouse_y):
+                        update_settings_file()
+                        save_game(save_slot, player, player_rect, brightness)
+                        pygame.quit()
+                        subprocess.Popen([sys.executable, "main_menu.py"])
+                        sys.exit()
+
+                elif pause_state == "OPTIONS":
+                    if pause_options_state == "MAIN":
+                        option_cards = [
+                            pygame.Rect(100, 95, 440, 40),
+                            pygame.Rect(100, 150, 440, 40),
+                            pygame.Rect(100, 205, 440, 40)
+                        ]
+
+                        if option_cards[0].collidepoint(mouse_x, mouse_y):
+                            pause_options_state = "AUDIO"
+                        elif option_cards[1].collidepoint(mouse_x, mouse_y):
+                            pause_options_state = "VIDEO"
+                        elif option_cards[2].collidepoint(mouse_x, mouse_y):
+                            pause_options_state = "CONTROLS"
+                        elif pygame.Rect(0, 310, base_res_x, 40).collidepoint(mouse_x, mouse_y):
+                            pause_state = "PAUSE"
+
+                    elif pause_options_state == "VIDEO":
+                        if pygame.Rect(0, 310, base_res_x, 40).collidepoint(mouse_x, mouse_y):
+                            pause_options_state = "MAIN"
+                            pause_dropdown_open = False
+                            pause_dragging_slider = None
+
+                        resolution_rect = pygame.Rect(270, 112, 245, 36)
+                        if resolution_rect.collidepoint(mouse_x, mouse_y):
+                            pause_dropdown_open = not pause_dropdown_open
+
+                        elif pause_dropdown_open:
+                            for index, option in enumerate(resolution_options):
+                                dropdown_rect = pygame.Rect(270, 145 + index * 30, 245, 30)
+                                if dropdown_rect.collidepoint(mouse_x, mouse_y):
+                                    selected_resolution = index
+                                    pause_dropdown_open = False
+                                    update_settings_file()
+                                    window_w, window_h = resolution_options[index]
+                                    if status == pygame.RESIZABLE:
+                                        screen_state_w, screen_state_h = window_w, window_h
+                                        screen = pygame.display.set_mode((screen_state_w, screen_state_h), status)
+                                    break
+
+                        fullscreen_rect = pygame.Rect(450, 157, 60, 36)
+                        if fullscreen_rect.collidepoint(mouse_x, mouse_y):
+                            fullscreen = not fullscreen
+                            update_settings_file()
+                            if fullscreen:
+                                status = pygame.FULLSCREEN
+                                screen_state_w, screen_state_h = display_w, display_h
+                                screen = pygame.display.set_mode((display_w, display_h), status)
+                            else:
+                                status = pygame.RESIZABLE
+                                screen_state_w, screen_state_h = window_w, window_h
+                                screen = pygame.display.set_mode((screen_state_w, screen_state_h), status)
+
+                        brightness_rect = pygame.Rect(270, 210, 220, 18)
+                        if brightness_rect.collidepoint(mouse_x, mouse_y):
+                            pause_dragging_slider = "brightness"
+                            brightness = max(0, min(100, int((mouse_x - 270) / 220 * 100)))
+                            brightness_surface = create_brightness_surface(brightness)
+                            update_settings_file()
+
+                    elif pause_options_state == "AUDIO":
+                        if pygame.Rect(0, 310, base_res_x, 40).collidepoint(mouse_x, mouse_y):
+                            pause_options_state = "MAIN"
+                            pause_dragging_slider = None
+
+                        audio_sliders = [("master", 130), ("music", 178), ("sfx", 226)]
+                        for slider_name, slider_y in audio_sliders:
+                            slider_rect = pygame.Rect(330, slider_y - 9, 190, 18)
+                            if slider_rect.collidepoint(mouse_x, mouse_y):
+                                pause_dragging_slider = slider_name
+                                value = max(0, min(100, int((mouse_x - 330) / 190 * 100)))
+                                if slider_name == "master":
+                                    master_volume = value
+                                elif slider_name == "music":
+                                    music_volume = value
+                                else:
+                                    sfx_volume = value
+                                break
+
+                    elif pause_options_state == "CONTROLS":
+                        if pygame.Rect(0, 310, base_res_x, 40).collidepoint(mouse_x, mouse_y):
+                            pause_options_state = "MAIN"
+                            pause_rebinding_control = None
+
+                        control_rows = [
+                            ("up", 105),
+                            ("left", 137),
+                            ("down", 169),
+                            ("right", 201),
+                            ("jump", 233)
+                        ]
+
+                        for control_name, row_y in control_rows:
+                            control_rect = pygame.Rect(80, row_y - 15, 480, 30)
+                            if control_rect.collidepoint(mouse_x, mouse_y):
+                                pause_rebinding_control = control_name
+                                break
+
+            if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                pause_dragging_slider = None
+
+            if event.type == pygame.MOUSEMOTION and pause_dragging_slider:
+                if pause_dragging_slider == "brightness" and pause_options_state == "VIDEO":
+                    brightness = max(0, min(100, int((mouse_x - 270) / 220 * 100)))
+                    brightness_surface = create_brightness_surface(brightness)
+                    update_settings_file()
+                elif pause_dragging_slider in ("master", "music", "sfx") and pause_options_state == "AUDIO":
+                    value = max(0, min(100, int((mouse_x - 330) / 190 * 100)))
+                    if pause_dragging_slider == "master":
+                        master_volume = value
+                    elif pause_dragging_slider == "music":
+                        music_volume = value
+                    else:
+                        sfx_volume = value
+                    apply_audio_settings()
+                    update_settings_file()
+
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_F5:
+                save_game(save_slot, player, player_rect, brightness)
+
+            continue
+
         # *--KEY DETECTION--*
 
         # *--WINDOW CONTROLS--*
@@ -319,27 +569,150 @@ while True:
 
             # *--KEY PRESSED--*
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_d: #pressing D (right)
+            if event.key == control_keys["right"]: #pressing D (right)
                 moving_right = True
-            if event.key == pygame.K_a: #pressing A (left)
+            if event.key == control_keys["left"]: #pressing A (left)
                 moving_left = True
-            if event.key == pygame.K_SPACE:
+            if event.key == control_keys["jump"]:
                 press_space = True
 
 
             # *--KEY IS LET GO--*  
         if event.type == pygame.KEYUP:
 
-            if event.key == pygame.K_a and event.key == pygame.K_d and event.key == pygame.K_SPACE: #nothing is being touched
+            if event.key == control_keys["left"] and event.key == control_keys["right"] and event.key == control_keys["jump"]: #nothing is being touched
                 mode = 0  
-            if event.key == pygame.K_w:#let go of W (up)
+            if event.key == control_keys["up"]:#let go of W (up)
                 moving_up = False
-            if event.key == pygame.K_s:#let go of S (down)
+            if event.key == control_keys["down"]:#let go of S (down)
                 moving_down = False
-            if event.key == pygame.K_d: #let go of D (right)
+            if event.key == control_keys["right"]: #let go of D (right)
                 moving_right = False
-            if event.key == pygame.K_a: #let go of A (left)
+            if event.key == control_keys["left"]: #let go of A (left)
                 moving_left = False
+
+    # While paused, keep the last game frame visible and only draw the menu.
+    if paused:
+        display_canvas = canvas.copy()
+
+        if brightness < 50:
+            display_canvas.blit(brightness_surface, (0, 0), special_flags=pygame.BLEND_RGB_MULT)
+        elif brightness > 50:
+            display_canvas.blit(brightness_surface, (0, 0), special_flags=pygame.BLEND_RGB_ADD)
+
+        pause_overlay = pygame.Surface((base_res_x, base_res_y), pygame.SRCALPHA)
+        pause_overlay.fill((0, 0, 0, 150))
+        display_canvas.blit(pause_overlay, (0, 0))
+
+        mouse_pos = pygame.mouse.get_pos()
+        mouse_x = mouse_pos[0] * base_res_x / screen_state_w
+        mouse_y = mouse_pos[1] * base_res_y / screen_state_h
+
+        if pause_state == "PAUSE":
+            pause_title = font_pause_title.render("PAUSED", False, (240, 240, 240))
+            display_canvas.blit(pause_title, pause_title.get_rect(center=(base_res_x / 2, 55)))
+
+            pause_buttons = ["Resume", "Options", "Save", "Quit"]
+            for index, option in enumerate(pause_buttons):
+                button_rect = pygame.Rect(220, 105 + index * 45, 200, 38)
+                selected_color = (235, 65, 40) if button_rect.collidepoint(mouse_x, mouse_y) else (240, 240, 240)
+                option_text = font_pause.render(option, False, selected_color)
+                display_canvas.blit(option_text, option_text.get_rect(center=button_rect.center))
+
+        elif pause_state == "OPTIONS":
+            options_panel = pygame.Surface((520, 285), pygame.SRCALPHA)
+            options_panel.fill((15, 15, 20, 205))
+            pygame.draw.rect(options_panel, (60, 60, 70, 255), options_panel.get_rect(), 2)
+            display_canvas.blit(options_panel, (60, 45))
+
+            if pause_options_state == "MAIN":
+                options_title = font_pause_title.render("OPTIONS", False, (240, 240, 240))
+                display_canvas.blit(options_title, options_title.get_rect(center=(base_res_x / 2, 65)))
+
+                option_cards = ["Audio Settings", "Video Settings", "Controls"]
+                for index, option in enumerate(option_cards):
+                    card_rect = pygame.Rect(100, 95 + index * 55, 440, 40)
+                    pygame.draw.rect(display_canvas, (25, 25, 30), card_rect, 2)
+                    color = (235, 65, 40) if card_rect.collidepoint(mouse_x, mouse_y) else (240, 240, 240)
+                    option_text = font_pause.render(option, False, color)
+                    display_canvas.blit(option_text, option_text.get_rect(midleft=(card_rect.left + 20, card_rect.centery)))
+                    arrow_text = font_pause.render(">", False, (235, 65, 40))
+                    display_canvas.blit(arrow_text, arrow_text.get_rect(midright=(card_rect.right - 20, card_rect.centery)))
+
+            elif pause_options_state == "VIDEO":
+                title = font_pause_title.render("VIDEO", False, (240, 240, 240))
+                display_canvas.blit(title, title.get_rect(center=(base_res_x / 2, 65)))
+
+                res_label = font_pause.render("Resolution:", False, (240, 240, 240))
+                display_canvas.blit(res_label, res_label.get_rect(midleft=(105, 120)))
+                res_value = font_pause.render(f"{resolution_options[selected_resolution][0]}x{resolution_options[selected_resolution][1]}", False, (235, 65, 40))
+                display_canvas.blit(res_value, res_value.get_rect(midright=(525, 120)))
+
+                fs_label = font_pause.render("Fullscreen:", False, (240, 240, 240))
+                display_canvas.blit(fs_label, fs_label.get_rect(midleft=(105, 165)))
+                fs_value = font_pause.render("ON" if fullscreen else "OFF", False, (235, 65, 40))
+                display_canvas.blit(fs_value, fs_value.get_rect(midright=(525, 165)))
+
+                bright_label = font_pause.render("Brightness:", False, (240, 240, 240))
+                display_canvas.blit(bright_label, bright_label.get_rect(midleft=(105, 220)))
+                slider_x, slider_y, slider_width = 270, 210, 220
+                pygame.draw.rect(display_canvas, (60, 60, 70), (slider_x, slider_y, slider_width, 14), 2)
+                handle_x = slider_x + (brightness / 100 * slider_width)
+                pygame.draw.rect(display_canvas, (235, 65, 40), (handle_x - 4, slider_y - 5, 8, 24))
+                value_text = font_pause_small.render(f"{brightness}%", False, (235, 65, 40))
+                display_canvas.blit(value_text, value_text.get_rect(midleft=(105, 255)))
+
+                if pause_dropdown_open:
+                    dropdown_rect = pygame.Rect(270, 145, 245, len(resolution_options) * 30)
+                    pygame.draw.rect(display_canvas, (15, 15, 20), dropdown_rect)
+                    pygame.draw.rect(display_canvas, (60, 60, 70), dropdown_rect, 2)
+                    for index, option in enumerate(resolution_options):
+                        option_text = font_pause_small.render(f"{option[0]}x{option[1]}", False, (240, 240, 240))
+                        display_canvas.blit(option_text, option_text.get_rect(midleft=(dropdown_rect.left + 12, 160 + index * 30)))
+
+            elif pause_options_state == "AUDIO":
+                title = font_pause_title.render("AUDIO", False, (240, 240, 240))
+                display_canvas.blit(title, title.get_rect(center=(base_res_x / 2, 65)))
+                audio_settings = [("Master Volume", master_volume), ("Music Volume", music_volume), ("SFX Volume", sfx_volume)]
+                for index, (label, value) in enumerate(audio_settings):
+                    row_y = 120 + index * 48
+                    label_text = font_pause.render(label, False, (240, 240, 240))
+                    display_canvas.blit(label_text, label_text.get_rect(midleft=(105, row_y)))
+                    slider_x, slider_y, slider_width = 330, row_y - 7, 190
+                    pygame.draw.rect(display_canvas, (60, 60, 70), (slider_x, slider_y, slider_width, 14), 2)
+                    handle_x = slider_x + (value / 100 * slider_width)
+                    pygame.draw.rect(display_canvas, (235, 65, 40), (handle_x - 4, slider_y - 5, 8, 24))
+                    value_text = font_pause_small.render(f"{value}%", False, (140, 140, 140))
+                    display_canvas.blit(value_text, value_text.get_rect(midleft=(532, row_y)))
+
+            elif pause_options_state == "CONTROLS":
+                title = font_pause_title.render("CONTROLS", False, (240, 240, 240))
+                display_canvas.blit(title, title.get_rect(center=(base_res_x / 2, 65)))
+                control_rows = [
+                    ("Move Up", controls.get("up", "W")),
+                    ("Move Left", controls.get("left", "A")),
+                    ("Move Down", controls.get("down", "S")),
+                    ("Move Right", controls.get("right", "D")),
+                    ("Jump", controls.get("jump", "Space"))
+                ]
+                for index, (action, key) in enumerate(control_rows):
+                    row_y = 105 + index * 32
+                    control_name = ["up", "left", "down", "right", "jump"][index]
+                    if pause_rebinding_control == control_name:
+                        key = "Press a key..."
+                    action_text = font_pause.render(action, False, (240, 240, 240))
+                    key_text = font_pause.render(key, False, (235, 65, 40))
+                    display_canvas.blit(action_text, action_text.get_rect(midleft=(105, row_y)))
+                    display_canvas.blit(key_text, key_text.get_rect(midright=(525, row_y)))
+
+            back_text = font_pause.render("Back", False, (235, 65, 40) if pygame.Rect(0, 310, base_res_x, 40).collidepoint(mouse_x, mouse_y) else (240, 240, 240))
+            display_canvas.blit(back_text, back_text.get_rect(center=(base_res_x / 2, 330)))
+
+        scaled_resolution = pygame.transform.scale(display_canvas, (screen_state_w, screen_state_h))
+        screen.blit(scaled_resolution, (0, 0))
+        pygame.display.update()
+        clock.tick(60)
+        continue
 
     #chunk manager
     position_chunk_x , position_chunk_y = world_to_chunk(player_rect.centerx, player_rect.centery)
@@ -625,16 +998,15 @@ while True:
     # x_flip tells the game whether it should flip the direction of the sprite on the x axis or not.
     # all sprites are all originally drawn to the right side.
 
-    # Brightness
-
-    # The brightness surface is created once when the game starts.
+    # Apply brightness to a copy so the base game frame stays unchanged.
+    display_canvas = canvas.copy()
     if brightness < 50:
-        canvas.blit(brightness_surface, (0, 0), special_flags=pygame.BLEND_RGB_MULT)
+        display_canvas.blit(brightness_surface, (0, 0), special_flags=pygame.BLEND_RGB_MULT)
     elif brightness > 50:
-        canvas.blit(brightness_surface, (0, 0), special_flags=pygame.BLEND_RGB_ADD)
+        display_canvas.blit(brightness_surface, (0, 0), special_flags=pygame.BLEND_RGB_ADD)
 
     #scale the screen
-    scaled_resolution = pygame.transform.scale(canvas, (screen_state_w, screen_state_h))
+    scaled_resolution = pygame.transform.scale(display_canvas, (screen_state_w, screen_state_h))
 
     screen.blit(scaled_resolution,(0,0))   #creates a window to be displayed
 
