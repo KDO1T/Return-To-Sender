@@ -91,7 +91,7 @@ def save_game(slot_index, player, player_rect, brightness=50):
         "player": {
             "Name": player.Name,
             "HP": player.HP,
-            "ATK": player.ATK,
+            "ATK": player.base_ATK,
             "CRIT_DMG": player.CRIT_DMG,
             "CRIT_CHANCE": player.CRIT_CHANCE,
             "LEVEL": player.LEVEL,
@@ -150,7 +150,7 @@ def load_game(slot_index, player, player_rect, default_brightness=50):
             player_data = data.get("player", {})
             player.Name = player_data.get("Name")
             player.HP = player_data.get("HP")
-            player.ATK = player_data.get("ATK")
+            player.base_ATK = player_data.get("ATK")
             player.CRIT_DMG = player_data.get("CRIT_DMG")
             player.CRIT_CHANCE = player_data.get("CRIT_CHANCE")
             player.LEVEL = player_data.get("LEVEL")
@@ -172,7 +172,7 @@ def load_game(slot_index, player, player_rect, default_brightness=50):
 
     player.Name = player_data.get("Name")
     player.HP = player_data.get("HP")
-    player.ATK = player_data.get("ATK")
+    player.base_ATK = player_data.get("ATK")
     player.CRIT_DMG = player_data.get("CRIT_DMG")
     player.CRIT_CHANCE = player_data.get("CRIT_CHANCE")
     player.LEVEL = player_data.get("LEVEL")

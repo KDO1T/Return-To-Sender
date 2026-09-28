@@ -112,7 +112,7 @@ font_pause_small = pygame.font.Font("fonts/VT323/VT323.ttf", 26)
 # *------------------------------------------------------------------- MAP STUFF -----------------------------------------------------------------------------------------*
 current_spritesheet = None
 
-sprites = Spritesheet('spritesheet.png')
+# sprites = Spritesheet('spritesheet.png')
 
 tile_size = 32
 #16 tiles / chunk
@@ -227,7 +227,7 @@ for i in range(3):
 
 #*---------------------------------------------------------------STAGES------------------------------------------------------------------------*
 #STAGE
-current_stage = 3
+current_stage = 1
 stage_length = 8
 #(-1)*(16tiles/1chunk) = minimum world_chunks
 min_world_chunks = 0
