@@ -1213,7 +1213,7 @@ while True:
         zombie.render_pos = ((zombie.rect.x - camera_x) - x_camera_delay, (zombie.rect.y - camera_y) - y_camera_delay)
     #                                                                                                   ^negative camera delay
         #disables zombie gravity if out of range
-        if zombie.render_pos[0] < position_chunk_x or zombie.render_pos[0] > position_chunk_x:
+        if zombie.render_pos[0] < position_chunk_x:
             zombie.y_momentum = 0
 
     #flipping code
