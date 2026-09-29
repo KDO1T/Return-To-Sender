@@ -69,12 +69,16 @@ class Player:
         if self.animation_mode == 3: #fall
             self.current_frames = self.all_frames[15:17]
 
+        if self.animation_mode == 4: #fall
+            self.current_frames = self.all_frames[18:21]
+        
+
         return self.current_frames
 
     def update_player_frame (self): #math for frame indexing
         self.animation_count += 1
 
-        if self.animation_count == 60:
+        if self.animation_count >= 60 and self.animation_mode != 4:
             self.animation_count = 0
 
         if self.animation_mode == 0: #idling
@@ -88,6 +92,21 @@ class Player:
             
         if self.animation_mode == 3: #falling
             self.frame_index = (self.animation_count // 20) % len(self.current_frames)
+
+        if self.animation_mode == 4: #attacking
+           pass # self.frame_index = (self.animation_count // 20) % len(self.current_frames)
+
+        if self.animation_mode == 4: #attacking
+            if self.animation_count < 5:  #wind up
+                self.frame_index = 0
+            elif self.animation_count < 8: #attacking
+                self.frame_index = 1
+            elif self.animation_count < 15: #wind down
+                self.frame_index = 2
+            else:
+                self.animation_count = 0
+                self.animation_mode = 0
+                self.frame_index = 0
 
         return self.animation_count, self.frame_index
 

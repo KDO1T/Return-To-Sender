@@ -150,7 +150,7 @@ player = Player(
     y_momentum = 0,
     max_air_jumps = 2,
     jump = False,
-    jump_height = 3,
+    jump_height = 10,
     on_ground = None,
     x_flip = False,
     all_frames = [],
@@ -191,7 +191,7 @@ zombie_sprite = pygame.image.load('animations/base_zombie.png')
 
 # *------------------------------ANIMATION------------------------------------------------------------------------
 
-jimmy_sheet = Spritesheet('animations/spritesheets/red_jimmy_sheet.png')
+jimmy_sheet = Spritesheet('animations/spritesheets/red_jimmy_sheet2.png')
 
 
 # 0-5 idle, 6-10 walk, 11-14 jump, 15-17 fall
@@ -216,8 +216,12 @@ for i in range(3):
     filename = f'fall_{i}'
     player.all_frames.append(jimmy_sheet.parse_sprite(filename))
 
+# -fall
+for i in range(3):
+    filename = f'attack_{i}'
+    player.all_frames.append(jimmy_sheet.parse_sprite(filename))
 
-# 0-5 idle, 6-10 walk, 11-14 jump, 15-17 fall
+# 0-5 idle, 6-10 walk, 11-14 jump, 15-17 fall, 18-20 attack
 # 0=idle, 1=walk, 2=jump, 3=fall
 
 
@@ -1057,7 +1061,9 @@ while True:
  #-----------------------------------------------------------------------------------------------------
     #chooses what type of action the player is doing to then determine animation playing
 
-    if player.on_ground == False and player.y_momentum > 0: #falling animation
+    if player.attacking:
+        player.animation_mode = 4
+    elif player.on_ground == False and player.y_momentum > 0: #falling animation
         player.animation_mode = 3
     elif player.on_ground == False and player.y_momentum <= 0: #jumping animation
         player.animation_mode = 2

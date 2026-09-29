@@ -1,0 +1,27 @@
+{
+    "slot_index": 0,
+    "name": "i love ni",
+    "brightness": 50,
+    "player": {
+        "Name": null,
+        "HP": -105,
+        "max_HP": 50,
+        "base_ATK": 5,
+        "CRIT_DMG": null,
+        "CRIT_CHANCE": null,
+        "LEVEL": null,
+        "EXP": null,
+        "DOLLARS": null,
+        "S_COIN": null
+    },
+    "position": {
+        "x": 776,
+        "y": 748
+    },
+    "world": {
+        "current_stage": 1,
+        "map_seed": 5345,
+        "spritesheet": "grass_spritesheet.png",
+        "zombie_count": 1
+    }
+}
