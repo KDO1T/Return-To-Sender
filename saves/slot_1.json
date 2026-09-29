@@ -1,0 +1,31 @@
+{
+    "slot_index": 1,
+    "name": "Save 2",
+    "brightness": 50,
+    "player": {
+        "Name": null,
+        "HP": 30,
+        "max_HP": 50,
+        "base_ATK": 5,
+        "CRIT_DMG": 1.5,
+        "CRIT_CHANCE": 0.05,
+        "LEVEL": 1,
+        "EXP": 0,
+        "DOLLARS": 0,
+        "S_COIN": 100
+    },
+    "position": {
+        "x": 1192,
+        "y": 224
+    },
+    "world": {
+        "current_stage": 1,
+        "map_seed": 2465,
+        "spritesheet": "cartoon_spritesheet.png",
+        "zombie_count": 1
+    },
+    "skill_tree": {
+        "purchased": [],
+        "ranged_unlocked": false
+    }
+}

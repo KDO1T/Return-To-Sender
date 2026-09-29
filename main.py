@@ -1,21 +1,18 @@
 import random
-import sys
 import subprocess
+import sys
 
 import pygame
 from perlin_noise import PerlinNoise
 from pygame.locals import *
 
+from entity import Player, Zombie, zombies
+from save_system import load_game, save_game
+from settings_system import load_settings, save_settings
+from skill_tree import SkillTreeState, SkillTreeUI, apply_skill_effects
 from spritesheet import Spritesheet
 from tilemap import *
-from perlin_noise import PerlinNoise
-from entity import Player, Zombie, zombies
 from world import World_Generation
-
-
-import random
-from save_system import save_game, load_game
-from settings_system import load_settings, save_settings
 
 # Safely get the brightness argument, default to 50, and keep it between 0 and 100.
 brightness = 50
@@ -104,13 +101,15 @@ brightness_surface = create_brightness_surface(brightness)
 
 clock = pygame.time.Clock() #assigning the clock function to a variable to use for the fps in the gameloop
 
-# pause menu fonts
+
 font_pause_title = pygame.font.Font("fonts/Press_Start_2P/PressStart2P.ttf", 24)
 font_pause = pygame.font.Font("fonts/VT323/VT323.ttf", 34)
 font_pause_small = pygame.font.Font("fonts/VT323/VT323.ttf", 26)
 
 # *------------------------------------------------------------------- MAP STUFF -----------------------------------------------------------------------------------------*
 current_spritesheet = None
+current_map_seed = None
+zombie_count = 1
 
 # sprites = Spritesheet('spritesheet.png')
 
@@ -236,8 +235,8 @@ loaded_chunks = {}
 
 spritesheet_pool = ['grass_spritesheet.png','cartoon_spritesheet.png']
 
-def load_stage(stage_number):
-    global current_stage, min_world_chunks, max_world_chunks, loaded_chunks, world, player_rect, current_spritesheet, spritesheet_pool
+def load_stage(stage_number, saved_seed=None, saved_spritesheet=None, reset_player=True):
+    global current_stage, min_world_chunks, max_world_chunks, loaded_chunks, world, player_rect, current_spritesheet, spritesheet_pool, current_map_seed
 
     current_stage = stage_number
     loaded_chunks.clear() #resets chunks loaded
@@ -249,16 +248,18 @@ def load_stage(stage_number):
     min_world_chunks = stage_min_chunk_x*world.chunk_pixel_w
     max_world_chunks = (stage_max_chunk_x+1)*world.chunk_pixel_w    
 
-    if len(spritesheet_pool)>0:
-        map_index = random.randrange(len(spritesheet_pool))
-
     #STAGE UPDATES
 
-    if stage_number == 1:
+    if saved_seed is not None and saved_spritesheet is not None:
+        new_seed = saved_seed
+        current_spritesheet = Spritesheet(saved_spritesheet)
+    elif stage_number == 1:
+        map_index = random.randrange(len(spritesheet_pool))
         new_seed = random.randint(1,10000)
         current_spritesheet = Spritesheet(spritesheet_pool[map_index])
         spritesheet_pool.pop(map_index)
-    elif stage_number ==2:
+    elif stage_number == 2:
+        map_index = random.randrange(len(spritesheet_pool))
         new_seed = random.randint(1,10000)
         current_spritesheet = Spritesheet(spritesheet_pool[map_index])
         spritesheet_pool.pop(map_index)
@@ -266,15 +267,25 @@ def load_stage(stage_number):
         new_seed = 69420
         current_spritesheet = Spritesheet('plague_spritesheet.png')
 
+    current_map_seed = new_seed
+
+    print(
+    "GENERATING WORLD:",
+    "stage =", current_stage,
+    "seed =", current_map_seed,
+    "player =", (player.rect.x, player.rect.y)
+    )
+
     #reinitialise perlin
     #Surface_Level
-    world.noise_1d = PerlinNoise(octaves=2, seed = int(new_seed))
+    world.noise1d = PerlinNoise(octaves=2, seed = int(new_seed))
     #Caves
-    world.noise_2d = PerlinNoise(octaves=3, seed = int(new_seed))
+    world.noise2d = PerlinNoise(octaves=3, seed = int(new_seed))
 
     #reset player to new stage
-    player.rect.x = (stage_min_chunk_x + 1)*world.chunk_pixel_w + 64
-    player.rect.y = 100
+    if reset_player:
+        player.rect.x = (stage_min_chunk_x + 1)*world.chunk_pixel_w + 64
+        player.rect.y = 100
 
 """------------------------------------------------------- In-Game Pause Menu ---------------------------------------------------------------"""
 
@@ -285,11 +296,45 @@ pause_options_state = "MAIN"
 pause_dragging_slider = None
 pause_dropdown_open = False
 pause_rebinding_control = None
+skills_opened_with_hotkey = False   # Sets itself to true when the skill tree is opened with K instead of the pause menu, to avoid error
+
+# Turn this off (or delete the F6 block in the event loop) once Soul Coins are earned in-game.
+DEBUG_SOUL_COINS = True
 
 # Load the player's saved progress. Global settings such as brightness are
 # kept separate from the save slot so the same settings are used everywhere.
-load_game(save_slot, player, player_rect, brightness)
+brightness, saved_world = load_game(save_slot, player, player_rect, brightness)
 brightness_surface = create_brightness_surface(brightness)
+
+# Skill tree: purchased skills + ranged unlock live on the player, so they come from THIS save slot.
+skill_tree = SkillTreeState(player)
+apply_skill_effects(player, skill_tree, heal_on_gain=False)
+skill_ui = SkillTreeUI(skill_tree, base_res_x, base_res_y)
+
+def pause_button_rects():
+    return [pygame.Rect(220, 100 + index * 42, 200, 38) for index in range(5)]
+
+
+def close_skill_tree():
+    global pause_state, paused
+    pause_state = "PAUSE"
+    if skills_opened_with_hotkey:
+        paused = False
+
+# Restore the saved world state before generating the current stage.
+saved_stage = saved_world.get("current_stage")
+saved_seed = saved_world.get("map_seed")
+
+print(
+    "LOADED WORLD:",
+    "stage =", current_stage,
+    "seed =", saved_seed,
+    "player =", (player.rect.x, player.rect.y)
+)
+saved_spritesheet = saved_world.get("spritesheet")
+saved_zombie_count = saved_world.get("zombie_count")
+if isinstance(saved_zombie_count, int) and saved_zombie_count >= 0:
+    zombie_count = saved_zombie_count
 
 
 def update_settings_file():
@@ -314,9 +359,30 @@ apply_audio_settings()
 
 
 
+def save_current_game():
+    spritesheet_name = None
+    if current_spritesheet is not None:
+        spritesheet_name = current_spritesheet.spritesheet
+
+    save_game(
+        save_slot,
+        player,
+        player_rect,
+        brightness,
+        current_stage,
+        current_map_seed,
+        spritesheet_name,
+        zombie_count
+    )
+
+
 #note for rendering: whatever is first rendered in the loop will be behind while whatever is last rendered in the loop will be in the very front
 # *--GAME LOOP--*
-load_stage(current_stage)
+if isinstance(saved_stage, int) and saved_stage >= 1 and saved_seed is not None and saved_spritesheet:
+    current_stage = saved_stage
+    load_stage(current_stage, saved_seed, saved_spritesheet, reset_player=False)
+else:
+    load_stage(current_stage)
 
 while True: 
 
@@ -334,7 +400,7 @@ while True:
         # *--QUIT--*
         if event.type == pygame.QUIT:
             update_settings_file()
-            save_game(save_slot, player, player_rect, brightness)
+            save_current_game()
             pygame.quit()
             sys.exit()
         # elif player.rect.right>total_map_w or player.rect.top <0 or player.rect.bottom> total_map_h:
@@ -348,7 +414,9 @@ while True:
 
         # ESC opens/closes the pause menu.
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            if pause_state == "OPTIONS":
+            if paused and pause_state == "SKILLS":
+                close_skill_tree()
+            elif pause_state == "OPTIONS":
                 if pause_options_state != "MAIN":
                     pause_options_state = "MAIN"
                 else:
@@ -359,7 +427,23 @@ while True:
 
         if event.type == pygame.KEYDOWN and event.key == pygame.K_F5:
             update_settings_file()
-            save_game(save_slot, player, player_rect, brightness)
+            save_current_game()
+
+        # K opens the skill tree straight from gameplay.
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_k and not paused:
+            paused = True
+            pause_state = "SKILLS"
+            skills_opened_with_hotkey = True
+            # key-release events are ignored while paused, so let go of held movement keys now
+            player.moving_left = player.moving_right = False
+            player.aim_left = player.aim_right = player.aim_up = player.aim_down = False
+            player.attacking = False
+            skill_ui.open()
+            continue
+
+        # DEBUG: F6 gives +10 Soul Coins so the skill tree can be tested.
+        if DEBUG_SOUL_COINS and event.type == pygame.KEYDOWN and event.key == pygame.K_F6:
+            player.S_COIN = (player.S_COIN or 0) + 10
         # elif player_rect.right>total_map_w or player_rect.top <0 or player_rect.bottom> total_map_h:
         #     pygame.quit()
         #     sys.exit()
@@ -371,26 +455,36 @@ while True:
             mouse_x = event.pos[0] * base_res_x / screen_state_w if hasattr(event, "pos") else 0
             mouse_y = event.pos[1] * base_res_y / screen_state_h if hasattr(event, "pos") else 0
 
+            # Skill tree screen: all input goes to the skill tree UI.
+            if pause_state == "SKILLS":
+                skill_result = skill_ui.handle_event(event, (mouse_x, mouse_y))
+                if skill_result == "purchased":
+                    apply_skill_effects(player, skill_tree, heal_on_gain=True)
+                    update_settings_file()
+                    save_current_game()        # auto-save so the purchase is stored in this slot
+                elif skill_result == "close":
+                    close_skill_tree()
+                continue
+
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if pause_state == "PAUSE":
-                    pause_buttons = [
-                        pygame.Rect(220, 105, 200, 38),
-                        pygame.Rect(220, 150, 200, 38),
-                        pygame.Rect(220, 195, 200, 38),
-                        pygame.Rect(220, 240, 200, 38)
-                    ]
+                    pause_buttons = pause_button_rects()
 
                     if pause_buttons[0].collidepoint(mouse_x, mouse_y):
                         paused = False
                     elif pause_buttons[1].collidepoint(mouse_x, mouse_y):
+                        pause_state = "SKILLS"
+                        skills_opened_with_hotkey = False
+                        skill_ui.open()
+                    elif pause_buttons[2].collidepoint(mouse_x, mouse_y):
                         pause_state = "OPTIONS"
                         pause_options_state = "MAIN"
-                    elif pause_buttons[2].collidepoint(mouse_x, mouse_y):
-                        update_settings_file()
-                        save_game(save_slot, player, player_rect, brightness)
                     elif pause_buttons[3].collidepoint(mouse_x, mouse_y):
                         update_settings_file()
-                        save_game(save_slot, player, player_rect, brightness)
+                        save_current_game()
+                    elif pause_buttons[4].collidepoint(mouse_x, mouse_y):
+                        update_settings_file()
+                        save_current_game()
                         pygame.quit()
                         subprocess.Popen([sys.executable, "main_menu.py"])
                         sys.exit()
@@ -513,7 +607,7 @@ while True:
                     update_settings_file()
 
             if event.type == pygame.KEYDOWN and event.key == pygame.K_F5:
-                save_game(save_slot, player, player_rect, brightness)
+                save_current_game()
 
             continue
 
@@ -598,14 +692,17 @@ while True:
 
         if pause_state == "PAUSE":
             pause_title = font_pause_title.render("PAUSED", False, (240, 240, 240))
-            display_canvas.blit(pause_title, pause_title.get_rect(center=(base_res_x / 2, 55)))
+            display_canvas.blit(pause_title, pause_title.get_rect(center=(base_res_x / 2, 50)))
 
-            pause_buttons = ["Resume", "Options", "Save", "Quit"]
+            pause_buttons = ["Resume", "Skill Tree", "Options", "Save", "Quit"]
             for index, option in enumerate(pause_buttons):
-                button_rect = pygame.Rect(220, 105 + index * 45, 200, 38)
+                button_rect = pause_button_rects()[index]
                 selected_color = (235, 65, 40) if button_rect.collidepoint(mouse_x, mouse_y) else (240, 240, 240)
                 option_text = font_pause.render(option, False, selected_color)
                 display_canvas.blit(option_text, option_text.get_rect(center=button_rect.center))
+
+        elif pause_state == "SKILLS":
+            skill_ui.draw(display_canvas, (mouse_x, mouse_y))
 
         elif pause_state == "OPTIONS":
             options_panel = pygame.Surface((520, 285), pygame.SRCALPHA)
@@ -729,8 +826,6 @@ while True:
 
     #Generating Zombies:
 
-    zombie_count = 1
-
     if len(zombies) < zombie_count:
 
         for i in range(zombie_count):
@@ -747,11 +842,11 @@ while True:
 
     #left and right movement
     if player.moving_right == True:
-        player.movement[0]= 4
+        player.movement[0]= player.move_speed
         player.rect.x += player.movement[0]
 
     if player.moving_left == True:
-        player.movement[0]= -4
+        player.movement[0]= -player.move_speed
         player.rect.x += player.movement[0]
 
     #collisions
