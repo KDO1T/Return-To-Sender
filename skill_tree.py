@@ -158,7 +158,6 @@ class SkillTreeState:
         self.player.ranged_unlocked = True
 
     def status(self, skill_id):
-        """'purchased' | 'available' | 'locked' | 'sealed'"""
         skill = SKILLS[skill_id]
         if skill_id in self.purchased:
             return "purchased"
@@ -170,7 +169,6 @@ class SkillTreeState:
         return "available"
 
     def status_text(self, skill_id):
-        """Human readable line for the detail panel -> (text, colour)."""
         state = self.status(skill_id)
         skill = SKILLS[skill_id]
         if state == "purchased":
