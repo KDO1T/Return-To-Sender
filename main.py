@@ -150,7 +150,7 @@ player = Player(
     y_momentum = 0,
     max_air_jumps = 2,
     jump = False,
-    jump_height = 10,
+    jump_height = 3,
     on_ground = None,
     x_flip = False,
     all_frames = [],
@@ -778,13 +778,40 @@ while True:
 
     #Generating Zombies:
 
-    if len(zombies) < zombie_count:
+    # if len(zombies) < zombie_count:
 
-        for i in range(zombie_count):
-            zombie = Zombie(None, [0,0],0,0,0, False, (0,0), None, '',None, 0, 0, False, False, False,0,45,100, 5)
-            zombie.generate_rect(i, position_chunk_x)
-            zombies.append(zombie)
-            zombie.chase_speed = random.randint(1,3)
+    #     for i in range(zombie_count):
+    #         zombie = Zombie(None, [0,0],0,0,0, False, (0,0), None, '',None, 0, 0, False, False, False,0,45,100, 5)
+    #         zombie.generate_rect(i, position_chunk_x)
+    #         zombies.append(zombie)
+    #         zombie.chase_speed = random.randint(1,3)
+
+
+    max_zombie_count = 15
+    zombies_per_chunk = 1  # number of zombies per chunk
+
+    # 1. Calculate maximum target count based on loaded chunks, capped by max_zombie_count
+    target_zombie_count = min(len(loaded_chunks) * zombies_per_chunk, max_zombie_count)
+
+    if len(zombies) < target_zombie_count: #if number of zombies isn't how many should be spawned, spawn them
+        needed_spawns = target_zombie_count - len(zombies) #how many remaining
+
+        for i in range(needed_spawns):
+            spawn_chunk_x, spawn_chunk_y = random.choice(list(loaded_chunks.keys()))
+            
+            chunk_start_x = spawn_chunk_x * chunk_pixel_w #<-- 256
+            chunk_end_x = chunk_start_x + chunk_pixel_w #<-- 256
+            
+            spawn_x = random.randint(chunk_start_x, chunk_end_x) #basically spawns them in random areas of the map
+            spawn_y = 50 
+
+            #initilaze zombies with the coordinates where they spawn (spawn_x, spawn_y)
+            new_zombie = Zombie( pygame.Rect(spawn_x, spawn_y, 20, 32),[0, 0],0,0,0,False,(0, 0),False,
+                '',None,random.randint(1, 3),0,False,False,False,0,45, 20,5)
+            zombies.append(new_zombie)
+
+    # Keep track of active zombie count for save files
+    zombie_count = len(zombies)
 
     # *---------------------------------------------------------------------------
 
@@ -903,6 +930,7 @@ while True:
         if zombie.staggered == False:
             player.damaged = zombie.attack_player(player.HP)
         player.receive_damage(zombie.ATK)
+        player.dead_check()
 
     
     
@@ -941,8 +969,9 @@ while True:
 
     
     for zombie in zombies: 
-        if zombie.render_pos[0] < position_chunk_x:#freezes movement horizontal movement if zombie isn't in frame
+        if zombie.render_pos[0] < position_chunk_x or zombie.render_pos[0] > position_chunk_x:#freezes movement horizontal movement if zombie isn't in frame
             zombie.idle_move = 'Still'
+        
 
         zombie.movement = [0,0]
 
@@ -1184,7 +1213,7 @@ while True:
         zombie.render_pos = ((zombie.rect.x - camera_x) - x_camera_delay, (zombie.rect.y - camera_y) - y_camera_delay)
     #                                                                                                   ^negative camera delay
         #disables zombie gravity if out of range
-        if zombie.render_pos[0] < position_chunk_x:
+        if zombie.render_pos[0] < position_chunk_x or zombie.render_pos[0] > position_chunk_x:
             zombie.y_momentum = 0
 
     #flipping code

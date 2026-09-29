@@ -97,11 +97,11 @@ class Player:
            pass # self.frame_index = (self.animation_count // 20) % len(self.current_frames)
 
         if self.animation_mode == 4: #attacking
-            if self.animation_count < 5:  #wind up
+            if self.animation_count < 7:  #wind up
                 self.frame_index = 0
-            elif self.animation_count < 8: #attacking
+            elif self.animation_count < 10: #attacking
                 self.frame_index = 1
-            elif self.animation_count < 15: #wind down
+            elif self.animation_count < 17: #wind down
                 self.frame_index = 2
             else:
                 self.animation_count = 0
@@ -168,10 +168,15 @@ class Player:
         if self.damaged is True:
             self.HP -= zombie_damage
             self.damaged = False
+            if self.HP > 0:
+                print(f'i have been hit by this filthy zombie for {zombie_damage} and now im {self.HP}. my maxHP is {self.max_HP}')
+            else:
+                print(f'im supposed to be dead')
 
-            print(f'i have been hit by this filthy zombie for {zombie_damage} and now im {self.HP}. my maxHP is {self.max_HP}')
-
-
+    def dead_check(self):
+        if self.HP <= 0:
+            #death animation/ death screen
+            pass
         
 
 
