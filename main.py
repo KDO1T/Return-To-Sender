@@ -1,21 +1,17 @@
 import random
-import sys
 import subprocess
+import sys
 
 import pygame
 from perlin_noise import PerlinNoise
 from pygame.locals import *
 
+from entity import Player, Zombie, zombies
+from save_system import load_game, save_game
+from settings_system import load_settings, save_settings
 from spritesheet import Spritesheet
 from tilemap import *
-from perlin_noise import PerlinNoise
-from entity import Player, Zombie, zombies
 from world import World_Generation
-
-
-import random
-from save_system import save_game, load_game
-from settings_system import load_settings, save_settings
 
 # Safely get the brightness argument, default to 50, and keep it between 0 and 100.
 brightness = 50
@@ -111,6 +107,8 @@ font_pause_small = pygame.font.Font("fonts/VT323/VT323.ttf", 26)
 
 # *------------------------------------------------------------------- MAP STUFF -----------------------------------------------------------------------------------------*
 current_spritesheet = None
+current_map_seed = None
+zombie_count = 1
 
 # sprites = Spritesheet('spritesheet.png')
 
@@ -236,8 +234,8 @@ loaded_chunks = {}
 
 spritesheet_pool = ['grass_spritesheet.png','cartoon_spritesheet.png']
 
-def load_stage(stage_number):
-    global current_stage, min_world_chunks, max_world_chunks, loaded_chunks, world, player_rect, current_spritesheet, spritesheet_pool
+def load_stage(stage_number, saved_seed=None, saved_spritesheet=None, reset_player=True):
+    global current_stage, min_world_chunks, max_world_chunks, loaded_chunks, world, player_rect, current_spritesheet, spritesheet_pool, current_map_seed
 
     current_stage = stage_number
     loaded_chunks.clear() #resets chunks loaded
@@ -249,16 +247,18 @@ def load_stage(stage_number):
     min_world_chunks = stage_min_chunk_x*world.chunk_pixel_w
     max_world_chunks = (stage_max_chunk_x+1)*world.chunk_pixel_w    
 
-    if len(spritesheet_pool)>0:
-        map_index = random.randrange(len(spritesheet_pool))
-
     #STAGE UPDATES
 
-    if stage_number == 1:
+    if saved_seed is not None and saved_spritesheet is not None:
+        new_seed = saved_seed
+        current_spritesheet = Spritesheet(saved_spritesheet)
+    elif stage_number == 1:
+        map_index = random.randrange(len(spritesheet_pool))
         new_seed = random.randint(1,10000)
         current_spritesheet = Spritesheet(spritesheet_pool[map_index])
         spritesheet_pool.pop(map_index)
-    elif stage_number ==2:
+    elif stage_number == 2:
+        map_index = random.randrange(len(spritesheet_pool))
         new_seed = random.randint(1,10000)
         current_spritesheet = Spritesheet(spritesheet_pool[map_index])
         spritesheet_pool.pop(map_index)
@@ -266,15 +266,25 @@ def load_stage(stage_number):
         new_seed = 69420
         current_spritesheet = Spritesheet('plague_spritesheet.png')
 
+    current_map_seed = new_seed
+
+    print(
+    "GENERATING WORLD:",
+    "stage =", current_stage,
+    "seed =", current_map_seed,
+    "player =", (player.rect.x, player.rect.y)
+    )
+
     #reinitialise perlin
     #Surface_Level
-    world.noise_1d = PerlinNoise(octaves=2, seed = int(new_seed))
+    world.noise1d = PerlinNoise(octaves=2, seed = int(new_seed))
     #Caves
-    world.noise_2d = PerlinNoise(octaves=3, seed = int(new_seed))
+    world.noise2d = PerlinNoise(octaves=3, seed = int(new_seed))
 
     #reset player to new stage
-    player.rect.x = (stage_min_chunk_x + 1)*world.chunk_pixel_w + 64
-    player.rect.y = 100
+    if reset_player:
+        player.rect.x = (stage_min_chunk_x + 1)*world.chunk_pixel_w + 64
+        player.rect.y = 100
 
 """------------------------------------------------------- In-Game Pause Menu ---------------------------------------------------------------"""
 
@@ -286,10 +296,24 @@ pause_dragging_slider = None
 pause_dropdown_open = False
 pause_rebinding_control = None
 
-# Load the player's saved progress. Global settings such as brightness are
-# kept separate from the save slot so the same settings are used everywhere.
-load_game(save_slot, player, player_rect, brightness)
+
+brightness, saved_world = load_game(save_slot, player, player_rect, brightness)
 brightness_surface = create_brightness_surface(brightness)
+
+
+saved_stage = saved_world.get("current_stage")
+saved_seed = saved_world.get("map_seed")
+
+print(
+    "LOADED WORLD:",
+    "stage =", current_stage,
+    "seed =", saved_seed,
+    "player =", (player.rect.x, player.rect.y)
+)
+saved_spritesheet = saved_world.get("spritesheet")
+saved_zombie_count = saved_world.get("zombie_count")
+if isinstance(saved_zombie_count, int) and saved_zombie_count >= 0:
+    zombie_count = saved_zombie_count
 
 
 def update_settings_file():
@@ -314,9 +338,30 @@ apply_audio_settings()
 
 
 
+def save_current_game():
+    spritesheet_name = None
+    if current_spritesheet is not None:
+        spritesheet_name = current_spritesheet.spritesheet
+
+    save_game(
+        save_slot,
+        player,
+        player_rect,
+        brightness,
+        current_stage,
+        current_map_seed,
+        spritesheet_name,
+        zombie_count
+    )
+
+
 #note for rendering: whatever is first rendered in the loop will be behind while whatever is last rendered in the loop will be in the very front
 # *--GAME LOOP--*
-load_stage(current_stage)
+if isinstance(saved_stage, int) and saved_stage >= 1 and saved_seed is not None and saved_spritesheet:
+    current_stage = saved_stage
+    load_stage(current_stage, saved_seed, saved_spritesheet, reset_player=False)
+else:
+    load_stage(current_stage)
 
 while True: 
 
@@ -334,7 +379,7 @@ while True:
         # *--QUIT--*
         if event.type == pygame.QUIT:
             update_settings_file()
-            save_game(save_slot, player, player_rect, brightness)
+            save_current_game()
             pygame.quit()
             sys.exit()
         # elif player.rect.right>total_map_w or player.rect.top <0 or player.rect.bottom> total_map_h:
@@ -359,7 +404,7 @@ while True:
 
         if event.type == pygame.KEYDOWN and event.key == pygame.K_F5:
             update_settings_file()
-            save_game(save_slot, player, player_rect, brightness)
+            save_current_game()
         # elif player_rect.right>total_map_w or player_rect.top <0 or player_rect.bottom> total_map_h:
         #     pygame.quit()
         #     sys.exit()
@@ -387,10 +432,10 @@ while True:
                         pause_options_state = "MAIN"
                     elif pause_buttons[2].collidepoint(mouse_x, mouse_y):
                         update_settings_file()
-                        save_game(save_slot, player, player_rect, brightness)
+                        save_current_game()
                     elif pause_buttons[3].collidepoint(mouse_x, mouse_y):
                         update_settings_file()
-                        save_game(save_slot, player, player_rect, brightness)
+                        save_current_game()
                         pygame.quit()
                         subprocess.Popen([sys.executable, "main_menu.py"])
                         sys.exit()
@@ -513,7 +558,7 @@ while True:
                     update_settings_file()
 
             if event.type == pygame.KEYDOWN and event.key == pygame.K_F5:
-                save_game(save_slot, player, player_rect, brightness)
+                save_current_game()
 
             continue
 
@@ -728,8 +773,6 @@ while True:
 
 
     #Generating Zombies:
-
-    zombie_count = 1
 
     if len(zombies) < zombie_count:
 
