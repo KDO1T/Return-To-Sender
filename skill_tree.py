@@ -1,26 +1,29 @@
-import math
-
 import pygame
 
-COL_BG = (12, 12, 16)
-COL_PANEL = (20, 20, 26)
-COL_PANEL_BORDER = (60, 60, 70)
-COL_TEXT = (240, 240, 240)
-COL_MUTED = (140, 140, 140)
-COL_DIM = (70, 70, 80)
-COL_ACCENT = (235, 65, 40)
-COL_SOUL = (100, 230, 220)
-COL_BAD = (235, 65, 40)
-COL_GOOD = (110, 215, 110)
+from spritesheet import Spritesheet
 
-HUB_POS = (320, 160) # position for the center of the skill tree
+# ==================================================
+# BACKEND DATA & CONSTANTS
+# ==================================================
+COL_BG = (15, 17, 23)
+COL_PANEL = (24, 28, 38)
+COL_PANEL_BORDER = (50, 58, 75)
+COL_TEXT = (240, 243, 250)
+COL_MUTED = (130, 140, 160)
+COL_DIM = (70, 78, 95)
+COL_ACCENT = (240, 80, 80)
+COL_SOUL = (80, 220, 200)
+COL_BAD = (240, 80, 80)
+COL_GOOD = (100, 220, 120)
+
+HUB_POS = (320, 160)  # Central origin point
 
 BRANCHES = {
-    "COMBAT":   {"color": (235, 65, 40),   "label_pos": (200, 44)},
-    "SURVIVAL": {"color": (90, 200, 90),   "label_pos": (213, 222)},
-    "MOVEMENT": {"color": (80, 170, 235),  "label_pos": (320, 252)},
-    "ECONOMY":  {"color": (235, 190, 60),  "label_pos": (400, 222)},
-    "WEAPONS":  {"color": (175, 115, 235), "label_pos": (440, 44)},
+    "COMBAT":   {"color": (240, 80, 80),   "label_pos": (200, 44)},
+    "SURVIVAL": {"color": (80, 210, 120),  "label_pos": (213, 222)},
+    "MOVEMENT": {"color": (70, 170, 240),  "label_pos": (320, 252)},
+    "ECONOMY":  {"color": (240, 190, 60),  "label_pos": (400, 222)},
+    "WEAPONS":  {"color": (180, 110, 240), "label_pos": (440, 44)},
 }
 
 SKILLS = {
@@ -121,18 +124,18 @@ EFFECT_KEYS = (
     "purchase_limit", "ranged_damage_pct", "ranged_capacity",
 )
 
-MIN_COMBO_COOLDOWN = 6      # limit the attack speed so it can never push the combo delay below 6 frames
+MIN_COMBO_COOLDOWN = 6
 
 
-# state of skill tree
+# ==================================================
+# BACKEND STATE MANAGER
+# ==================================================
 class SkillTreeState:
-
     def __init__(self, player):
         self.player = player
 
         saved = getattr(player, "skill_tree_purchased", None) or []
         clean = []
-        # ignores duplocates in old save
         for skill_id in saved:
             if skill_id in SKILLS and skill_id not in clean:
                 clean.append(skill_id)
@@ -141,54 +144,59 @@ class SkillTreeState:
         if not hasattr(player, "ranged_unlocked"):
             player.ranged_unlocked = False
 
-    @property
-    def purchased(self):
+    def get_purchased(self):
         return self.player.skill_tree_purchased
 
-    @property
-    def coins(self):
-        return int(self.player.S_COIN or 0)
+    def get_coins(self):
+        return int(getattr(self.player, "S_COIN", 0) or 0)
 
-    @property
-    def ranged_unlocked(self):
+    def add_soul_coins(self, amount=50):
+        current = self.get_coins()
+        self.player.S_COIN = current + amount
+
+    def is_ranged_unlocked(self):
         return bool(getattr(self.player, "ranged_unlocked", False))
 
     def unlock_ranged_weapon(self):
-        """Call this when the final boss is defeated."""
         self.player.ranged_unlocked = True
 
     def status(self, skill_id):
+        if skill_id not in SKILLS:
+            return "locked"
         skill = SKILLS[skill_id]
-        if skill_id in self.purchased:
+        purchased = self.get_purchased()
+
+        if skill_id in purchased:
             return "purchased"
-        if skill["requires_ranged"] and not self.ranged_unlocked:
+        if skill["requires_ranged"] and not self.is_ranged_unlocked():
             return "sealed"
         parent = skill["parent"]
-        if parent is not None and parent not in self.purchased:
+        if parent is not None and parent not in purchased:
             return "locked"
         return "available"
 
     def status_text(self, skill_id):
         state = self.status(skill_id)
         skill = SKILLS[skill_id]
+        coins = self.get_coins()
+
         if state == "purchased":
             return "UNLOCKED", COL_GOOD
         if state == "sealed":
-            return "SEALED - Unlocks after the final boss", BRANCHES["WEAPONS"]["color"]
+            return "SEALED - Unlocks after final boss", BRANCHES["WEAPONS"]["color"]
         if state == "locked":
             return f"LOCKED - Requires {SKILLS[skill['parent']]['name']}", COL_MUTED
-        if self.coins < skill["cost"]:
-            return f"AVAILABLE - Need {skill['cost'] - self.coins} more coins", COL_ACCENT
-        return "AVAILABLE", (235, 190, 60)
+        if coins < skill["cost"]:
+            return f"AVAILABLE - Need {skill['cost'] - coins} more coins", COL_ACCENT
+        return "AVAILABLE", (240, 190, 60)
 
     def can_buy(self, skill_id):
-        return self.status(skill_id) == "available" and self.coins >= SKILLS[skill_id]["cost"]
+        return self.status(skill_id) == "available" and self.get_coins() >= SKILLS[skill_id]["cost"]
 
-    # --------------- actions ------------------------------------------------------------------
     def buy(self, skill_id):
-        """Returns (success, message)."""
         state = self.status(skill_id)
         skill = SKILLS[skill_id]
+        coins = self.get_coins()
 
         if state == "purchased":
             return False, "Already unlocked."
@@ -196,34 +204,25 @@ class SkillTreeState:
             return False, "Defeat the final boss first."
         if state == "locked":
             return False, f"Unlock {SKILLS[skill['parent']]['name']} first."
-        if self.coins < skill["cost"]:
+        if coins < skill["cost"]:
             return False, "Not enough Soul Coins."
 
-        self.player.S_COIN = self.coins - skill["cost"]
-        self.purchased.append(skill_id)
+        self.player.S_COIN = coins - skill["cost"]
+        self.get_purchased().append(skill_id)
         return True, f"{skill['name']} unlocked!"
 
-    # ---- effects ------------------------------------------------------------------
     def effects(self):
-        """Sum of every purchased skill's effects (all keys always present)."""
         totals = {key: 0 for key in EFFECT_KEYS}
-        for skill_id in self.purchased:
+        for skill_id in self.get_purchased():
             for key, value in SKILLS[skill_id]["effects"].items():
                 totals[key] += value
         return totals
 
 
 def apply_skill_effects(player, tree, heal_on_gain=True):
-    """
-    Copies the skill-tree bonuses onto the player. Safe to call as many times as you like
-    (it removes the previous max-HP bonus before adding the new one).
-
-    heal_on_gain=True  -> when Maximum Health is bought, current HP also goes up by the same amount
-    heal_on_gain=False -> use right after loading a save so HP is not changed
-    """
     fx = tree.effects()
 
-    # max HP
+    # Max HP
     old_bonus = getattr(player, "bonus_max_HP", 0)
     new_bonus = int(fx["max_hp"])
     delta = new_bonus - old_bonus
@@ -233,7 +232,7 @@ def apply_skill_effects(player, tree, heal_on_gain=True):
     player.HP = min(player.HP, player.max_HP)
     player.bonus_max_HP = new_bonus
 
-    # combat
+    # Combat stats
     player.damage_mult = 1.0 + fx["damage_pct"]
     player.crit_chance_bonus = fx["crit_chance"]
     player.crit_dmg_bonus = fx["crit_damage"]
@@ -241,140 +240,67 @@ def apply_skill_effects(player, tree, heal_on_gain=True):
     base_cd = getattr(player, "base_combo_cooldown", player.combo_cooldown)
     player.combo_cooldown = max(MIN_COMBO_COOLDOWN, round(base_cd / (1.0 + fx["attack_speed_pct"])))
 
-    # survival
+    # Survival stats
     player.damage_reduction = min(0.9, fx["damage_reduction"])
     player.knockback_resist = min(1.0, fx["knockback_resist"])
 
-    # movement (base speed 4 px/frame; Rect positions are integers so the bonus is whole pixels)
+    # Movement speed
     player.move_speed = getattr(player, "base_move_speed", 4) + int(fx["move_speed_bonus"])
 
-    # values for systems that do not exist yet (like the shop and the ranged weapon) just change from here later
     player.skill_effects = fx
 
-# rendering for icons
-def _p(cx, cy, k, x, y):
-    return (int(round(cx + x * k)), int(round(cy + y * k)))
+
+# ==================== FRONTEND ====================
+
+def blend_color(c1, c2, factor):
+    """Blends two RGB color tuples cleanly without math module."""
+    return (
+        int(c1[0] + (c2[0] - c1[0]) * factor),
+        int(c1[1] + (c2[1] - c1[1]) * factor),
+        int(c1[2] + (c2[2] - c1[2]) * factor),
+    )
 
 
-def _bullet(surf, cx, cy, k, col, ox=0.0, scale=1.0):
-    s = k * scale
-    x = cx + ox * k
-    pygame.draw.rect(surf, col, (int(x - 3 * s), int(cy - 2 * s), max(1, int(6 * s)), max(1, int(10 * s))))
-    pygame.draw.polygon(surf, col, [(int(x - 3 * s), int(cy - 2 * s)), (int(x), int(cy - 8 * s)), (int(x + 3 * s), int(cy - 2 * s))])
-    pygame.draw.line(surf, COL_BG, (int(x - 3 * s), int(cy + 5 * s)), (int(x + 3 * s), int(cy + 5 * s)), max(1, int(s)))
-
-
-def draw_icon(surf, skill_id, cx, cy, col, k=1.0):
-    w = max(1, int(round(2 * k)))
-    P = lambda x, y: _p(cx, cy, k, x, y)
-
-
-    if skill_id == "attack_damage":
-        pygame.draw.line(surf, col, P(-4, 4), P(6, -6), max(2, int(3 * k)))
-        pygame.draw.line(surf, col, P(-6, 0), P(0, 6), w)
-        pygame.draw.circle(surf, col, P(-7, 7), max(1, int(1.5 * k)))
-
-    elif skill_id == "crit_chance":
-        pygame.draw.circle(surf, col, P(0, 0), int(6 * k), w)
-        for a, b in (((-9, 0), (-3, 0)), ((3, 0), (9, 0)), ((0, -9), (0, -3)), ((0, 3), (0, 9))):
-            pygame.draw.line(surf, col, P(*a), P(*b), w)
-        pygame.draw.circle(surf, col, P(0, 0), max(1, int(1.2 * k)))
-
-
-    elif skill_id == "crit_damage":
-        pts = []
-        for i in range(16):
-            r = 9 if i % 2 == 0 else 3.6
-            ang = math.pi * i / 8 - math.pi / 2
-            pts.append(P(math.cos(ang) * r, math.sin(ang) * r))
-        pygame.draw.polygon(surf, col, pts)
-
-    elif skill_id in ("attack_speed",):
-        pygame.draw.lines(surf, col, False, [P(-8, -6), P(-2, 0), P(-8, 6)], w)
-        pygame.draw.lines(surf, col, False, [P(0, -6), P(6, 0), P(0, 6)], w)
-
-    elif skill_id == "max_health":
-        pygame.draw.circle(surf, col, P(-3.5, -2), int(4.2 * k))
-        pygame.draw.circle(surf, col, P(3.5, -2), int(4.2 * k))
-        pygame.draw.polygon(surf, col, [P(-7.6, 0), P(7.6, 0), P(0, 8.5)])
-
-    elif skill_id == "damage_reduction":
-        pts = [P(-7, -7), P(7, -7), P(7, 1), P(0, 8), P(-7, 1)]
-        pygame.draw.polygon(surf, col, pts, w)
-        pygame.draw.line(surf, col, P(0, -7), P(0, 7), max(1, int(k)))
-
-    elif skill_id == "knockback_resistance":
-        pygame.draw.rect(surf, col, (int(cx + 2 * k), int(cy - 8 * k), max(2, int(5 * k)), max(2, int(16 * k))))
-        pygame.draw.line(surf, col, P(-8, 0), P(-1, 0), w)
-        pygame.draw.polygon(surf, col, [P(-3, -3), P(0, 0), P(-3, 3)])
-
-    elif skill_id == "movement_speed":
-        pygame.draw.line(surf, col, P(-8, -4), P(-3, -4), w)
-        pygame.draw.line(surf, col, P(-8, 4), P(-3, 4), w)
-        pygame.draw.line(surf, col, P(-6, 0), P(2, 0), w)
-        pygame.draw.polygon(surf, col, [P(1, -6), P(8, 0), P(1, 6)])
-
-    elif skill_id == "shop_expansion":
-        pygame.draw.polygon(surf, col, [P(-8, -2), P(-6, -8), P(6, -8), P(8, -2)])
-        pygame.draw.rect(surf, col, (int(cx - 6 * k), int(cy - 2 * k), max(2, int(12 * k)), max(2, int(10 * k))), w)
-        pygame.draw.rect(surf, col, (int(cx - 2 * k), int(cy + 2 * k), max(2, int(4 * k)), max(2, int(6 * k))))
-
-    elif skill_id == "purchase_limit":
-        for y in (-7, -2, 3):
-            pygame.draw.ellipse(surf, col, (int(cx - 6 * k), int(cy + y * k), max(2, int(12 * k)), max(2, int(5 * k))), max(1, int(k)))
-
-
-
-    elif skill_id == "blade_damage":
-        pygame.draw.polygon(surf, col, [P(0, -9), P(2, -6), P(2, 3), P(-2, 3), P(-2, -6)])
-        pygame.draw.rect(surf, col, (int(cx - 5 * k), int(cy + 3 * k), max(2, int(10 * k)), max(1, int(2 * k))))
-        pygame.draw.rect(surf, col, (int(cx - 1 * k), int(cy + 5 * k), max(1, int(2 * k)), max(2, int(3 * k))))
-        pygame.draw.circle(surf, col, P(0, 9), max(1, int(1.3 * k)))
-
-
-    elif skill_id == "blade_attack_speed":
-        pygame.draw.polygon(surf, col, [P(4, -9), P(6, -6), P(6, 3), P(2, 3), P(2, -6)])
-        pygame.draw.rect(surf, col, (int(cx - 1 * k), int(cy + 3 * k), max(2, int(10 * k)), max(1, int(2 * k))))
-        pygame.draw.rect(surf, col, (int(cx + 3 * k), int(cy + 5 * k), max(1, int(2 * k)), max(2, int(3 * k))))
-        for y, x0 in ((-6, -9), (-2, -8), (2, -9)):
-            pygame.draw.line(surf, col, P(x0, y), P(-2, y), max(1, int(k)))
-
-    elif skill_id == "ranged_damage":                       
-        _bullet(surf, cx, cy, k, col)
-
-    elif skill_id == "ranged_capacity":                     
-        for ox in (-6, 0, 6):
-            _bullet(surf, cx, cy + 1 * k, k, col, ox, 0.8)
-
-
-def _draw_padlock(surf, x, y, col):
-    """Tiny padlock, (x, y) = top-left of a 7x9 area."""
-    pygame.draw.rect(surf, col, (x + 1, y, 5, 5), 1)
-    pygame.draw.rect(surf, col, (x, y + 4, 7, 5))
-
-
-def _draw_check(surf, x, y, col):
-    pygame.draw.lines(surf, col, False, [(x, y + 3), (x + 2, y + 5), (x + 6, y)], 2)
-
-
-def _blend(a, b, t):
-    return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(3))
-
-
-def _load_font(path, size):
+def load_font(path, size):
+    """Loads custom font with fallback to standard system font."""
     try:
         return pygame.font.Font(path, size)
     except (FileNotFoundError, OSError):
         return pygame.font.Font(None, int(size * 0.8))
 
 
+def load_spritesheet_icons(png_path="skilltree_spritesheet.png"):
+    """Loads icon surfaces using your teammate's Spritesheet class."""
+    icons = {}
+    try:
+        sheet = Spritesheet(png_path)
+        icon_mapping = {
+            "attack_damage": "01_sword.png",
+            "crit_chance": "02_crosshair.png",
+            "crit_damage": "03_blazing_star.png",
+            "attack_speed": "08_dagger_speed.png",
+            "max_health": "11_heart.png",
+            "damage_reduction": "12_shield.png",
+            "knockback_resistance": "13_arrow_wall.png",
+            "movement_speed": "04_double_chevron.png",
+            "shop_expansion": "14_shop.png",
+            "purchase_limit": "15_shop_plus.png",
+            "blade_damage": "05_dagger.png",
+            "blade_attack_speed": "08_dagger_speed.png",
+            "ranged_damage": "06_bullet.png",
+            "ranged_capacity": "07_triple_bullet.png",
+        }
+        for skill_id, frame_name in icon_mapping.items():
+            icons[skill_id] = sheet.parse_sprite(frame_name)
+    except Exception:
+        pass
+    return icons
 
-#--------- UI--------------------------------------------------------------
 
 class SkillTreeUI:
-    NODE = 32
-    PANEL = pygame.Rect(16, 264, 608, 76)       # detail panel
-    BUTTON = pygame.Rect(494, 296, 120, 28)     # unlock button
+    NODE_SIZE = 32
+    PANEL = pygame.Rect(16, 260, 608, 76)
+    BUTTON = pygame.Rect(490, 298, 120, 30)
 
     def __init__(self, state, base_w=640, base_h=360):
         self.state = state
@@ -384,280 +310,225 @@ class SkillTreeUI:
         self.message_timer = 0
         self.message_color = COL_MUTED
 
-        self.font_title = _load_font("fonts/Press_Start_2P/PressStart2P.ttf", 16)
-        self.font_name = _load_font("fonts/VT323/VT323.ttf", 30)
-        self.font = _load_font("fonts/VT323/VT323.ttf", 24)
-        self.font_small = _load_font("fonts/VT323/VT323.ttf", 20)
+        self.font_title = load_font("fonts/Press_Start_2P/PressStart2P.ttf", 16)
+        self.font_name = load_font("fonts/VT323/VT323.ttf", 26)
+        self.font = load_font("fonts/VT323/VT323.ttf", 22)
+        self.font_small = load_font("fonts/VT323/VT323.ttf", 18)
 
-        self.node_rects = {
-            skill_id: pygame.Rect(0, 0, self.NODE, self.NODE) for skill_id in SKILLS
-        }
-        for skill_id, rect in self.node_rects.items():
-            rect.center = SKILLS[skill_id]["pos"]
+        # Load icons using Spritesheet class
+        self.icons = load_spritesheet_icons()
 
-        self.background = self._build_background()
-
-    # initialize and reset the UI
-    def _build_background(self):
-        bg = pygame.Surface((self.w, self.h))
-        bg.fill(COL_BG)
-        for x in range(8, self.w, 16):
-            for y in range(40, 262, 16):
-                bg.set_at((x, y), (24, 24, 30))
-        vignette = pygame.Surface((self.w, self.h), pygame.SRCALPHA)
-        for i in range(28):                                     # dark edges
-            alpha = int(150 * (1 - i / 28) ** 2)
-            pygame.draw.rect(vignette, (0, 0, 0, alpha), (i, i, self.w - 2 * i, self.h - 2 * i), 1)
-        bg.blit(vignette, (0, 0))
-        pygame.draw.line(bg, COL_PANEL_BORDER, (0, 31), (self.w, 31), 2)
-        return bg
+        # Rectangular node click bounds
+        self.node_rects = {}
+        half = self.NODE_SIZE // 2
+        for skill_id, skill in SKILLS.items():
+            cx, cy = skill["pos"]
+            self.node_rects[skill_id] = pygame.Rect(cx - half, cy - half, self.NODE_SIZE, self.NODE_SIZE)
 
     def open(self):
         self.message = ""
         self.message_timer = 0
 
-    def _flash(self, text, color):
+    def flash_message(self, text, color):
         self.message = text
         self.message_color = color
-        self.message_timer = 100
+        self.message_timer = 120
 
-    # input
-    def handle_event(self, event, mouse_pos):
-        """
-        mouse_pos: mouse position already converted to 640x360 canvas coordinates.
-        Returns None, "close" or "purchased".
-        """
+    def handle_event(self, event, mouse_pos=(-1, -1)):
+        """Handles mouse clicks and cheat/navigation hotkeys."""
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self.BUTTON.collidepoint(mouse_pos):
-                return self._try_buy()
+                return self.try_buy_selected()
+
             for skill_id, rect in self.node_rects.items():
-                if rect.inflate(6, 6).collidepoint(mouse_pos):
+                if rect.collidepoint(mouse_pos):
                     self.selected = skill_id
                     self.message = ""
                     return None
 
         elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_k:
+            if event.key in (pygame.K_ESCAPE, pygame.K_k):
                 return "close"
-            if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_e):
-                return self._try_buy()
-            direction = {
-                pygame.K_LEFT: (-1, 0), pygame.K_a: (-1, 0),
-                pygame.K_RIGHT: (1, 0), pygame.K_d: (1, 0),
-                pygame.K_UP: (0, -1), pygame.K_w: (0, -1),
-                pygame.K_DOWN: (0, 1), pygame.K_s: (0, 1),
-            }.get(event.key)
-            if direction:
-                self._move_selection(direction)
+
+            if event.key == pygame.K_F6:
+                self.state.add_soul_coins(50)
+                self.flash_message("+50 Soul Coins!", COL_SOUL)
+                return None
+
         return None
 
-    def _try_buy(self):
+    def try_buy_selected(self):
         already_owned = self.state.status(self.selected) == "purchased"
         ok, text = self.state.buy(self.selected)
-        self._flash(text, COL_GOOD if ok else (COL_MUTED if already_owned else COL_BAD))
+        self.flash_message(text, COL_GOOD if ok else (COL_MUTED if already_owned else COL_BAD))
         return "purchased" if ok else None
 
-    def _move_selection(self, direction):
-        sx, sy = SKILLS[self.selected]["pos"]
-        best, best_score = None, None
-        for skill_id, skill in SKILLS.items():
-            if skill_id == self.selected:
-                continue
-            dx, dy = skill["pos"][0] - sx, skill["pos"][1] - sy
-            along = dx * direction[0] + dy * direction[1]       # distance in the pressed direction
-            across = abs(dx * direction[1]) + abs(dy * direction[0])
-            if along <= 4:
-                continue
-            score = along + across * 2
-            if best_score is None or score < best_score:
-                best, best_score = skill_id, score
-        if best:
-            self.selected = best
-            self.message = ""
+    def wrap_text(self, text, font, max_width):
+        words = text.split()
+        lines = []
+        current_line = ""
+        for word in words:
+            test_line = f"{current_line} {word}".strip()
+            if font.size(test_line)[0] <= max_width:
+                current_line = test_line
+            else:
+                lines.append(current_line)
+                current_line = word
+        if current_line:
+            lines.append(current_line)
+        return lines
 
-    # -------------------------------------- drawing --------------------------------------------
     def draw(self, surface, mouse_pos=(-1, -1)):
         if self.message_timer > 0:
             self.message_timer -= 1
             if self.message_timer == 0:
                 self.message = ""
 
-        surface.blit(self.background, (0, 0))
-        self._draw_header(surface)
-        self._draw_connections(surface)
-        self._draw_hub(surface)
-        self._draw_branch_labels(surface)
-        for skill_id in SKILLS:
-            self._draw_node(surface, skill_id, mouse_pos)
-        self._draw_details(surface, mouse_pos)
+        surface.fill(COL_BG)
+        pygame.draw.rect(surface, COL_PANEL_BORDER, (0, 0, self.w, self.h), 3)
 
-        hint = self.font_small.render(
-            "Click / Arrows: select    Enter: unlock    ESC / K: close", False, COL_DIM)
+        self.draw_header(surface)
+        self.draw_connections(surface)
+        self.draw_hub(surface)
+        self.draw_branch_labels(surface)
+
+        for skill_id in SKILLS:
+            self.draw_node(surface, skill_id, mouse_pos)
+
+        self.draw_details(surface, mouse_pos)
+
+        hint = self.font_small.render("Mouse: Select / Unlock    ESC / K: Close", False, COL_DIM)
         surface.blit(hint, hint.get_rect(midbottom=(self.w // 2, self.h - 3)))
 
-    def _draw_header(self, surface):
+    def draw_header(self, surface):
         title = self.font_title.render("SKILL TREE", False, COL_TEXT)
-        surface.blit(title, title.get_rect(midleft=(16, 16)))
+        surface.blit(title, (16, 10))
 
-        coins = self.font.render(f"{self.state.coins}", False, COL_SOUL)
-        label = self.font_small.render("SOUL COINS", False, COL_MUTED)
-        coin_rect = coins.get_rect(midright=(self.w - 16, 16))
-        label_rect = label.get_rect(midright=(coin_rect.left - 26, 16))
-        surface.blit(coins, coin_rect)
-        surface.blit(label, label_rect)
-        self._draw_coin(surface, coin_rect.left - 13, 16, 7)
+        coins_str = str(self.state.get_coins())
+        coins_surf = self.font.render(coins_str, False, COL_SOUL)
+        label_surf = self.font_small.render("SOUL COINS", False, COL_MUTED)
 
-    def _draw_coin(self, surface, x, y, r):
-        pygame.draw.circle(surface, _blend(COL_SOUL, (0, 0, 0), 0.55), (x, y), r)
-        pygame.draw.circle(surface, COL_SOUL, (x, y), r, 2)
-        pygame.draw.circle(surface, COL_SOUL, (x, y), max(1, r // 3))
+        coins_rect = coins_surf.get_rect(topright=(self.w - 16, 10))
+        label_rect = label_surf.get_rect(topright=(coins_rect.left - 24, 12))
 
-    def _draw_connections(self, surface):
+        surface.blit(coins_surf, coins_rect)
+        surface.blit(label_surf, label_rect)
+        pygame.draw.circle(surface, COL_SOUL, (coins_rect.left - 12, coins_rect.centery), 6, 2)
+
+    def draw_connections(self, surface):
         for skill_id, skill in SKILLS.items():
             parent = skill["parent"]
-            start = HUB_POS if parent is None else SKILLS[parent]["pos"]
-            end = skill["pos"]
-            base = BRANCHES[skill["branch"]]["color"]
+            start_pos = HUB_POS if parent is None else SKILLS[parent]["pos"]
+            end_pos = skill["pos"]
+            branch_col = BRANCHES[skill["branch"]]["color"]
             state = self.state.status(skill_id)
 
             if state == "purchased":
-                pygame.draw.line(surface, _blend(base, (0, 0, 0), 0.5), start, end, 5)   # glow
-                pygame.draw.line(surface, base, start, end, 3)
+                pygame.draw.line(surface, branch_col, start_pos, end_pos, 3)
             elif state == "available":
-                pygame.draw.line(surface, _blend(base, COL_BG, 0.6), start, end, 2)
+                pygame.draw.line(surface, blend_color(branch_col, COL_BG, 0.5), start_pos, end_pos, 2)
             else:
-                pygame.draw.line(surface, (36, 36, 44), start, end, 2)
+                pygame.draw.line(surface, (35, 40, 52), start_pos, end_pos, 1)
 
-    def _draw_hub(self, surface):
+    def draw_hub(self, surface):
         x, y = HUB_POS
-        pulse = 0.5 + 0.5 * math.sin(pygame.time.get_ticks() / 500)
-        pygame.draw.circle(surface, _blend(COL_BG, COL_SOUL, 0.10 + 0.08 * pulse), (x, y), 19)
-        pygame.draw.circle(surface, COL_PANEL, (x, y), 14)
-        pygame.draw.circle(surface, _blend(COL_MUTED, COL_SOUL, 0.5), (x, y), 14, 2)
-        pygame.draw.polygon(surface, COL_SOUL, [(x, y - 7), (x + 5, y), (x, y + 7), (x - 5, y)])
+        pygame.draw.rect(surface, COL_PANEL, (x - 12, y - 12, 24, 24))
+        pygame.draw.rect(surface, COL_SOUL, (x - 12, y - 12, 24, 24), 2)
+        pygame.draw.rect(surface, COL_SOUL, (x - 4, y - 4, 8, 8))
 
-    def _draw_branch_labels(self, surface):
+    def draw_branch_labels(self, surface):
         for name, info in BRANCHES.items():
-            text = self.font_small.render(name, False, _blend(info["color"], COL_BG, 0.25))
-            surface.blit(text, text.get_rect(center=info["label_pos"]))
+            label = self.font_small.render(name, False, blend_color(info["color"], COL_BG, 0.3))
+            surface.blit(label, label.get_rect(center=info["label_pos"]))
 
-    def _draw_node(self, surface, skill_id, mouse_pos):
+    def draw_node(self, surface, skill_id, mouse_pos):
         skill = SKILLS[skill_id]
         rect = self.node_rects[skill_id]
-        base = BRANCHES[skill["branch"]]["color"]
+        branch_col = BRANCHES[skill["branch"]]["color"]
         state = self.state.status(skill_id)
         hovered = rect.collidepoint(mouse_pos)
 
         if state == "purchased":
-            fill = _blend(COL_PANEL, base, 0.28)
-            border = base
-            icon = _blend(base, (255, 255, 255), 0.35)
+            fill_col = blend_color(COL_PANEL, branch_col, 0.3)
+            border_col = branch_col
         elif state == "available":
-            fill = _blend(COL_PANEL, base, 0.08)
-            border = _blend(base, COL_BG, 0.35)
-            icon = _blend(base, COL_TEXT, 0.35)
+            fill_col = COL_PANEL
+            border_col = blend_color(branch_col, COL_BG, 0.3)
         else:
-            fill = (16, 16, 20)
-            border = (44, 44, 52)
-            icon = (58, 58, 66)
+            fill_col = (20, 22, 30)
+            border_col = (45, 50, 65)
 
         if hovered and state != "purchased":
-            border = _blend(border, COL_TEXT, 0.35)
+            border_col = COL_TEXT
 
-        if state == "purchased":
-            glow = rect.inflate(6, 6)
-            pygame.draw.rect(surface, _blend(COL_BG, base, 0.25), glow)
+        pygame.draw.rect(surface, fill_col, rect)
+        pygame.draw.rect(surface, border_col, rect, 2)
 
-        pygame.draw.rect(surface, fill, rect)
-        pygame.draw.rect(surface, border, rect, 2)
-        draw_icon(surface, skill_id, rect.centerx, rect.centery, icon, 1.0)
-
-        if state == "purchased":
-            _draw_check(surface, rect.right - 9, rect.top + 3, COL_TEXT)
-        elif state in ("locked", "sealed"):
-            pad_col = BRANCHES["WEAPONS"]["color"] if state == "sealed" else (95, 95, 105)
-            _draw_padlock(surface, rect.right - 9, rect.bottom - 11, pad_col)
+        icon = self.icons.get(skill_id)
+        if icon:
+            icon_rect = icon.get_rect(center=rect.center)
+            surface.blit(icon, icon_rect)
 
         if skill_id == self.selected:
-            t = pygame.time.get_ticks() / 250
-            pad = 4 + int(1.5 * (0.5 + 0.5 * math.sin(t)))
-            sel = rect.inflate(pad * 2, pad * 2)
-            c, L = COL_TEXT, 6
-            for (px, py, sx, sy) in ((sel.left, sel.top, 1, 1), (sel.right - 1, sel.top, -1, 1),
-                                     (sel.left, sel.bottom - 1, 1, -1), (sel.right - 1, sel.bottom - 1, -1, -1)):
-                pygame.draw.line(surface, c, (px, py), (px + sx * L, py), 2)
-                pygame.draw.line(surface, c, (px, py), (px, py + sy * L), 2)
+            phase = (pygame.time.get_ticks() // 150) % 4
+            pad = 2 + (phase if phase <= 2 else 4 - phase)
+            sel_rect = rect.inflate(pad * 2, pad * 2)
+            pygame.draw.rect(surface, COL_TEXT, sel_rect, 1)
 
-    def _draw_details(self, surface, mouse_pos):
+    def draw_details(self, surface, mouse_pos):
         skill = SKILLS[self.selected]
-        base = BRANCHES[skill["branch"]]["color"]
+        branch_col = BRANCHES[skill["branch"]]["color"]
         state = self.state.status(self.selected)
 
-        panel = self.PANEL
-        pygame.draw.rect(surface, COL_PANEL, panel)
-        pygame.draw.rect(surface, COL_PANEL_BORDER, panel, 2)
-        pygame.draw.line(surface, base, (panel.left + 2, panel.top + 1), (panel.right - 3, panel.top + 1), 2)
+        pygame.draw.rect(surface, COL_PANEL, self.PANEL)
+        pygame.draw.rect(surface, COL_PANEL_BORDER, self.PANEL, 2)
+        pygame.draw.rect(surface, branch_col, (self.PANEL.left, self.PANEL.top, 5, self.PANEL.height))
 
-        # big icon box
-        box = pygame.Rect(panel.left + 12, panel.top + 12, 52, 52)
-        active = state in ("purchased", "available")
-        pygame.draw.rect(surface, _blend(COL_BG, base, 0.15) if active else (16, 16, 20), box)
-        pygame.draw.rect(surface, base if state == "purchased" else (_blend(base, COL_BG, 0.4) if active else (44, 44, 52)), box, 2)
-        draw_icon(surface, self.selected, box.centerx, box.centery,
-                  _blend(base, COL_TEXT, 0.3) if active else (70, 70, 78), 2.2)
+        icon_box = pygame.Rect(self.PANEL.left + 14, self.PANEL.top + 14, 48, 48)
+        pygame.draw.rect(surface, (18, 20, 28), icon_box)
+        pygame.draw.rect(surface, branch_col if state == "purchased" else COL_PANEL_BORDER, icon_box, 1)
+        
+        icon = self.icons.get(self.selected)
+        if icon:
+            surface.blit(icon, icon.get_rect(center=icon_box.center))
 
-        tx = box.right + 14
-        name = self.font_name.render(skill["name"], False, COL_TEXT)
-        surface.blit(name, (tx, panel.top + 4))
-        tag = self.font_small.render(f"[ {skill['branch']} ]", False, base)
-        surface.blit(tag, tag.get_rect(midleft=(tx + name.get_width() + 10, panel.top + 17)))
+        tx = icon_box.right + 14
+        title_surf = self.font_name.render(skill["name"], False, COL_TEXT)
+        surface.blit(title_surf, (tx, self.PANEL.top + 8))
 
-        # description (wrapped to the space left of the cost / button column)
-        for i, line in enumerate(self._wrap(skill["desc"], self.font, 390)[:1]):
-            surface.blit(self.font.render(line, False, (200, 200, 205)), (tx, panel.top + 30 + i * 16))
+        tag_surf = self.font_small.render(f"[{skill['branch']}]", False, branch_col)
+        surface.blit(tag_surf, (tx + title_surf.get_width() + 10, self.PANEL.top + 13))
 
-        # temporary feedback message
+        desc_lines = self.wrap_text(skill["desc"], self.font_small, 340)
+        if desc_lines:
+            desc_surf = self.font_small.render(desc_lines[0], False, COL_MUTED)
+            surface.blit(desc_surf, (tx, self.PANEL.top + 34))
+
         if self.message:
-            status_text, status_color = self.message, self.message_color
+            msg_text, msg_col = self.message, self.message_color
         else:
-            status_text, status_color = self.state.status_text(self.selected)
-        surface.blit(self.font_small.render(status_text, False, status_color), (tx, panel.bottom - 22))
+            msg_text, msg_col = self.state.status_text(self.selected)
+        surface.blit(self.font_small.render(msg_text, False, msg_col), (tx, self.PANEL.top + 52))
 
-        # cost and unlock button
-        cost_col = COL_SOUL
-        if state in ("available",) and self.state.coins < skill["cost"]:
-            cost_col = COL_BAD
-        cost = self.font_name.render(str(skill["cost"]), False, cost_col)
-        cost_rect = cost.get_rect(midleft=(self.BUTTON.centerx - 8, panel.top + 20))
-        surface.blit(cost, cost_rect)
-        self._draw_coin(surface, cost_rect.left - 12, cost_rect.centery, 7)
+        cost_col = COL_SOUL if state != "available" or self.state.get_coins() >= skill["cost"] else COL_BAD
+        cost_surf = self.font.render(str(skill["cost"]), False, cost_col)
+        cost_rect = cost_surf.get_rect(center=(self.BUTTON.centerx + 8, self.PANEL.top + 20))
+        surface.blit(cost_surf, cost_rect)
+        pygame.draw.circle(surface, cost_col, (cost_rect.left - 10, cost_rect.centery), 5, 2)
 
         if state == "purchased":
-            label, label_col, edge, fill = "OWNED", COL_GOOD, (60, 110, 60), (18, 30, 18)
-        elif state == "available" and self.state.coins >= skill["cost"]:
+            btn_label, btn_col, btn_bg = "OWNED", COL_GOOD, (20, 40, 25)
+        elif state == "available" and self.state.get_coins() >= skill["cost"]:
             hover = self.BUTTON.collidepoint(mouse_pos)
-            label, label_col = "UNLOCK", COL_TEXT
-            edge = COL_TEXT if hover else COL_ACCENT
-            fill = (70, 22, 14) if hover else (45, 16, 12)
+            btn_label = "UNLOCK"
+            btn_col = COL_TEXT
+            btn_bg = (180, 50, 50) if hover else (120, 35, 35)
         elif state == "available":
-            label, label_col, edge, fill = "NEED COINS", COL_MUTED, (70, 70, 80), (20, 20, 26)
+            btn_label, btn_col, btn_bg = "NEED COINS", COL_MUTED, (35, 38, 50)
         else:
-            label, label_col, edge, fill = "LOCKED", COL_DIM, (50, 50, 58), (16, 16, 20)
-        pygame.draw.rect(surface, fill, self.BUTTON)
-        pygame.draw.rect(surface, edge, self.BUTTON, 2)
-        text = self.font.render(label, False, label_col)
-        surface.blit(text, text.get_rect(center=self.BUTTON.center))
+            btn_label, btn_col, btn_bg = "LOCKED", COL_DIM, (25, 28, 38)
 
-    @staticmethod
-    def _wrap(text, font, max_width):
-        words, lines, line = text.split(), [], ""
-        for word in words:
-            trial = f"{line} {word}".strip()
-            if font.size(trial)[0] <= max_width:
-                line = trial
-            else:
-                lines.append(line)
-                line = word
-        if line:
-            lines.append(line)
-        return lines
+        pygame.draw.rect(surface, btn_bg, self.BUTTON)
+        pygame.draw.rect(surface, btn_col, self.BUTTON, 1)
+        lbl_surf = self.font_small.render(btn_label, False, btn_col)
+        surface.blit(lbl_surf, lbl_surf.get_rect(center=self.BUTTON.center))
