@@ -1,3 +1,7 @@
+import random
+from tilemap import Obstacle
+from spritesheet import Spritesheet
+
 class World_Generation:
     def __init__(self, tile_size, chunk_tiles_x, chunk_tiles_y, noise1d, noise2d):
         self.tile_size = tile_size
@@ -7,6 +11,17 @@ class World_Generation:
         self.chunk_pixel_h = chunk_tiles_y * tile_size
         self.noise1d = noise1d
         self.noise2d = noise2d
+        self.obstacle_spritesheet  = Spritesheet('obstacle_spritesheet.png')  #change this.
+        self.obstacle_types = []
+        for sprite_name, frame_data in self.obstacle_spritesheet.data['frames'].items():
+            is_solid = not sprite_name.startswith('bush')   #checks if sprite is a solid state
+
+            self.obstacle_types.append({
+                'sprite': sprite_name,
+                'solid': is_solid,
+                'w': frame_data['frame']['w'],
+                'h': frame_data['frame']['h'],
+            })
 
     def world_to_chunk(self,world_x,world_y):
         chunk_x, chunk_y = int(world_x//self.chunk_pixel_w), int(world_y//self.chunk_pixel_h)
@@ -90,3 +105,58 @@ class World_Generation:
                                 if tile_above == '-1':
                                     grid[y][x] = '1'
         return grid
+
+    def generate_chunk_obstacles(self, chunk_x, chunk_y, tile_grid):
+        chunk_obstacles = []
+        chunk_world_min_x = chunk_x * self.chunk_pixel_w
+
+        num_rows = len(tile_grid)
+        if num_rows >0:
+            num_columns = len(tile_grid[0])
+        else:
+            num_columns = 0
+
+        min_obstacle_spacing = 3
+        last_spawned_column = -min_obstacle_spacing
+
+
+        for column in range(num_columns):
+
+            if column - last_spawned_column < min_obstacle_spacing:
+                continue
+            
+            for row in range(num_rows):
+                tile_id = tile_grid[row][column]
+
+                if tile_id != '-1' and row >0 and tile_grid[row-1][column] == '-1':
+
+                    #Flat ground check
+                    is_flat = False
+                    if column + 1 < num_columns:
+                        adjacent_ground = tile_grid[row][column + 1] != '-1'
+                        adjacent_air = tile_grid[row-1][column+1] == '-1'
+                        if adjacent_air and adjacent_ground:
+                            is_flat = True
+
+                    if is_flat and random.random() < 0.15:    #15% of spawning an obstacle
+                        obstacle_info = random.choice(self.obstacle_types)
+
+                        #obstacle spawn coords
+                        obstacle_x = chunk_world_min_x + (column*self.tile_size)
+                        obstacle_y = chunk_y*self.chunk_pixel_h + random.randint(0,64)
+
+                        obstacle = Obstacle(
+                            sprite_name= obstacle_info['sprite'],
+                            x= obstacle_x,
+                            y= obstacle_y,
+                            spritesheet= self.obstacle_spritesheet,
+                            solid=obstacle_info['solid'],
+                            width = obstacle_info.get('w',32),
+                            height = obstacle_info.get('h',32)
+                        )
+                        chunk_obstacles.append(obstacle)
+                        last_spawned_column = column
+                    break #stop finding once object is placed
+
+        return chunk_obstacles
+

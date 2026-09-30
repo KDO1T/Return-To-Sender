@@ -116,6 +116,7 @@ tile_size = 32
 #16 tiles / chunk
 chunk_tiles_x = 16
 chunk_tiles_y = 16
+obstacles = []
 
 chunk_pixel_w = chunk_tiles_x*tile_size
 chunk_pixel_h = chunk_tiles_y*tile_size
@@ -247,6 +248,7 @@ def load_stage(stage_number, saved_seed=None, saved_spritesheet=None, reset_play
     current_stage = stage_number
     loaded_chunks.clear() #resets chunks loaded
     spawned_chunks.clear()
+    obstacles.clear()
     zombies.clear()
     stage_spawned_zombies = 0
 
@@ -767,8 +769,11 @@ while True:
             needed_chunks.add(chunk_key)
 
             if chunk_key not in loaded_chunks:
-                raw_data = world.generate_chunk_data(chunk_x,chunk_y)
-                loaded_chunks[chunk_key] = TileMap(raw_data,current_spritesheet, tile_size)
+                tile_grid = world.generate_chunk_data(chunk_x,chunk_y)
+                loaded_chunks[chunk_key] = TileMap(tile_grid,current_spritesheet, tile_size)
+
+                new_obstacles = world.generate_chunk_obstacles(chunk_x, chunk_y, tile_grid)
+                obstacles.extend(new_obstacles)
 
     for chunk_key in list(loaded_chunks.keys()):
         if chunk_key not in needed_chunks:
@@ -779,6 +784,12 @@ while True:
         chunk_world_x = chunk_x * chunk_pixel_w
         chunk_world_y = chunk_y * chunk_pixel_h
         tile_rect.extend(tile_map.get_rects(chunk_world_x,chunk_world_y))
+
+    collision_rects = tile_rect.copy()
+    for obstacle in obstacles:
+        if obstacle.solid:
+            collision_rects.append(obstacle.rect)
+
     # *--------------------------SPAWNING/DESPAWNING ZOMBIES----------------------------------
 
 
@@ -851,6 +862,13 @@ while True:
             if player.movement[0] < 0:
                 player.rect.left = tile.right
 
+    for rect in collision_rects:
+        if player.rect.colliderect(rect):
+            if player.movement[0] > 0:
+                player.rect.right = rect.left
+            if player.movement[0]< 0:
+                player.rect.left = rect.right
+
     #clamping
     if player.rect.left < min_world_chunks:
         player.rect.left = min_world_chunks
@@ -895,6 +913,18 @@ while True:
             if player.movement[1] < 0:
                 player.rect.top = tile.bottom
                 player.y_momentum = 0 # <-- same with this
+
+    for rect in collision_rects:
+        if player.rect.colliderect(rect):
+            if player.movement[1] > 0:
+                player.rect.bottom = rect.top
+                player.y_momentum = 0 
+                player.on_ground = True
+        
+            if player.movement[1] < 0:
+                player.rect.top = rect.bottom
+                player.y_momentum = 0 
+
 
 
     #                    *--JUMP--*
@@ -1217,8 +1247,10 @@ while True:
         tile_map.draw_map(canvas, (camera_x + x_camera_delay), (camera_y + y_camera_delay) ,offset_x=chunk_world_x,offset_y=chunk_world_y)
     #                                        ^positive map delay           ^
 
-
-     
+    for obstacle in obstacles:   
+        obstacle.update(tile_rect)
+        
+        obstacle.draw(canvas, camera_x, camera_y, x_camera_delay, y_camera_delay)
     
     player_render_pos = ((player.rect.x - camera_x) - x_camera_delay, (player.rect.y - camera_y) - y_camera_delay) #centers player on screen
     #                                                                                                   ^negative camera delay
