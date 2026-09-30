@@ -150,7 +150,7 @@ player = Player(
     y_momentum = 0,
     max_air_jumps = 2,
     jump = False,
-    jump_height = 3,
+    jump_height = 4.5,
     on_ground = None,
     x_flip = False,
     all_frames = [],
@@ -235,14 +235,20 @@ stage_length = 8
 min_world_chunks = 0
 max_world_chunks = 0
 loaded_chunks = {}
+spawned_chunks = set()
+stage_spawned_zombies = 0
+stage_max_zombies = 30
 
 spritesheet_pool = ['grass_spritesheet.png','cartoon_spritesheet.png']
 
 def load_stage(stage_number, saved_seed=None, saved_spritesheet=None, reset_player=True):
-    global current_stage, min_world_chunks, max_world_chunks, loaded_chunks, world, player_rect, current_spritesheet, spritesheet_pool, current_map_seed
+    global current_stage, min_world_chunks, max_world_chunks, loaded_chunks, world, player_rect, current_spritesheet, spritesheet_pool, current_map_seed, spawned_chunks, stage_spawned_zombie
 
     current_stage = stage_number
     loaded_chunks.clear() #resets chunks loaded
+    spawned_chunks.clear()
+    zombies.clear()
+    stage_spawned_zombies = 0
 
     stage_min_chunk_x = ((stage_number-1)*stage_length) - 1
     stage_max_chunk_x = stage_min_chunk_x + stage_length
@@ -776,42 +782,50 @@ while True:
     # *--------------------------SPAWNING/DESPAWNING ZOMBIES----------------------------------
 
 
-    #Generating Zombies:
+    # DESPAWNING ZOMBIES
+    despawn_distance = 4 * chunk_pixel_w
+    for zombie in zombies[:] :
+        #check if zombie position exceeds despawn distance
+        if abs(zombie.rect.centerx - player.rect.centerx) > despawn_distance:
+            zombies.remove(zombie)
 
-    # if len(zombies) < zombie_count:
+    if player.moving_right:
+        target_chunk_x = position_chunk_x + 1
+    elif player.moving_left:
+        target_chunk_x = position_chunk_x - 1
+    else:
+        #spawns starts at position-1
+        target_chunk_x = position_chunk_x - 1
 
-    #     for i in range(zombie_count):
-    #         zombie = Zombie(None, [0,0],0,0,0, False, (0,0), None, '',None, 0, 0, False, False, False,0,45,100, 5)
-    #         zombie.generate_rect(i, position_chunk_x)
-    #         zombies.append(zombie)
-    #         zombie.chase_speed = random.randint(1,3)
+    #set a tuple for the position in the grid dict
+    target_chunk_position = (target_chunk_x, position_chunk_y)
 
+    if target_chunk_position in loaded_chunks and target_chunk_position not in spawned_chunks:
+        if stage_spawned_zombies < stage_max_zombies:
+            spawned_chunks.add(target_chunk_position)
 
-    max_zombie_count = 15
-    zombies_per_chunk = 1  # number of zombies per chunk
+            chunk_min_x = target_chunk_x * chunk_pixel_w
+            chunk_max_x = chunk_min_x + chunk_pixel_w - 32 #-32 to account for zombie size
 
-    # 1. Calculate maximum target count based on loaded chunks, capped by max_zombie_count
-    target_zombie_count = min(len(loaded_chunks) * zombies_per_chunk, max_zombie_count)
+            #SPAWNING ZOMBIES
+            for _ in range(3):
+                spawn_x = random.randint(chunk_min_x, chunk_max_x)
 
-    if len(zombies) < target_zombie_count: #if number of zombies isn't how many should be spawned, spawn them
-        needed_spawns = target_zombie_count - len(zombies) #how many remaining
+                spawn_y = 100
 
-        for i in range(needed_spawns):
-            spawn_chunk_x, spawn_chunk_y = random.choice(list(loaded_chunks.keys()))
-            
-            chunk_start_x = spawn_chunk_x * chunk_pixel_w #<-- 256
-            chunk_end_x = chunk_start_x + chunk_pixel_w #<-- 256
-            
-            spawn_x = random.randint(chunk_start_x, chunk_end_x) #basically spawns them in random areas of the map
-            spawn_y = 50 
-
-            #initilaze zombies with the coordinates where they spawn (spawn_x, spawn_y)
-            new_zombie = Zombie( pygame.Rect(spawn_x, spawn_y, 20, 32),[0, 0],0,0,0,False,(0, 0),False,
-                '',None,random.randint(1, 3),0,False,False,False,0,45, 20,5)
-            zombies.append(new_zombie)
-
-    # Keep track of active zombie count for save files
+                new_zombie = Zombie(
+                    pygame.Rect(spawn_x, spawn_y, 32 ,32),
+                    [0,0], 0 , 0 , 0, False, (0,0), False, 
+                    'Still', False, random.randint(1,3), 0,
+                    False, False, False, 0, 45, int(current_stage*5 + 15), 
+                    int(current_stage*2 + 5)
+                )
+                zombies.append(new_zombie)
+            stage_spawned_zombies += 1
     zombie_count = len(zombies)
+
+    
+
 
     # *---------------------------------------------------------------------------
 
