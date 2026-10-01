@@ -132,6 +132,9 @@ world = World_Generation(
 
 render_distance = 2
 
+screen_shake_x=0
+screen_shake_y=0
+
 # *-----------------------------------------------------------PLAYER STUFF---------------------------------------------------------------------*
 
 player = Player(
@@ -154,6 +157,8 @@ player = Player(
     press_space = False,
     hor_aim_list = [],
     vert_aim_list = [],
+    holding_up = False,
+    holding_down = False,
     aim_up = False,
     aim_down = False,
     aim_right = False,
@@ -177,6 +182,7 @@ player = Player(
     base_ATK=5, 
     attacking = False,
     holding_attack = False,
+    hit_landed = False,
     attacked = False,
     attack_count = 0,
     combo_stage = 1,
@@ -448,6 +454,7 @@ def save_current_game():
     )
 
 
+
 #note for rendering: whatever is first rendered in the loop will be behind while whatever is last rendered in the loop will be in the very front
 # *--GAME LOOP--*
 if isinstance(saved_stage, int) and saved_stage >= 1 and saved_seed is not None and saved_spritesheet:
@@ -692,10 +699,10 @@ while True:
     
 
         if event.type == pygame.KEYDOWN:
-            if event.key == control_keys["up"]: #pressing W (up)
-                player.aim_up = True
-                player.aim_down = False
-    
+            if event.key == control_keys["up"] and player: #pressing W (up)
+                player.holding_up = True
+                if 'up' not in vert_recentely_aimed:
+                    player.vert_aim_list.append("up")
 
             if event.key == control_keys["left"]: #pressing A (left)
                 player.moving_left = True
@@ -703,8 +710,9 @@ while True:
                     player.hor_aim_list.append('left')
 
             if event.key == control_keys["down"]: #pressing S (down)
-                player.aim_down = True
-                player.aim_up = False
+                player.holding_down = True
+                if 'down' not in vert_recentely_aimed:
+                    player.vert_aim_list.append("down")
 
                
             if event.key == control_keys["right"]: #pressing D (right)
@@ -725,13 +733,13 @@ while True:
 
 
             if event.key == control_keys["up"]:#let go of W (up)
-                player.aim_up = False
+                player.holding_up = False
 
             if event.key == control_keys["left"]: #let go of A (left)
                 player.moving_left = False
     
             if event.key == control_keys["down"]:#let go of S (down)
-                player.aim_down = False
+                player.holding_down = False
             
             if event.key == control_keys["right"]: #let go of D (right)
                 player.moving_right = False
@@ -938,8 +946,6 @@ while True:
     #hard locks the player to face one direction:
     
     #ensures only 2 states are contained within each list as to not flood the memory
-
-
  
     if len(player.hor_aim_list) > 2:
         player.hor_aim_list.pop(0)
@@ -952,21 +958,54 @@ while True:
         player.aim_left = True
         player.aim_right = False
 
-    # #later change the aim up and down code to only function/end when the moves are used
-    # if len(player.vert_aim_list) > 3 :
-    #     player.vert_aim_list.pop(0)
 
-    # if player.vert_aim_list[-1] == 'up':
-    #     player.aim_up = True
-    #     player.aim_down = False
+    if len(player.vert_aim_list) > 2:
+        player.vert_aim_list.pop(0)
 
-    # if player.vert_aim_list[-1] == 'down':
-    #     player.aim_down = True
+    if not player.attacking:
+        # Free movement aim updates when idle/moving
+        player.aim_up = player.holding_up and player.vert_aim_list[-1] == 'up'
+        player.aim_down = player.holding_down and player.vert_aim_list[-1] == 'down'
+    else:
+        # Mid-attack queue resolution at completion checkpoints (0, 19, 39, 59)
+        if player.attack_count in (0, 19, 39, 59):
+            if player.holding_up and player.vert_aim_list[-1] == 'up':
+                player.aim_up = True
+                player.aim_down = False
+            elif player.holding_down and player.vert_aim_list[-1] == 'down':
+                player.aim_down = True
+                player.aim_up = False
+            else:
+                player.aim_up = False
+                player.aim_down = False
+
+
+
+    # if player.attacking == True: #if the player is attacking and the player has recently done an attack, then the player can switch to up or down
+    #     if player.attack_count in (5,25,45):
+    #         if player.holding_up and player.vert_aim_list[-1] == 'up':
+    #             player.aim_up = True
+    #             player.aim_down = False
+    
+    #         elif player.holding_down and player.vert_aim_list[-1] == 'down':
+    #             player.aim_down = True
+    #             player.aim_up = False
+
+
+    # else:#if the player isn't attacking then it will reset
     #     player.aim_up = False
+    #     player.aim_down = False
+            
 
-    # if player.vert_aim_list[-1] == 'still':
-    #     pass
 
+    # if player.attacking != True: #basically when the player is not attacking it would determine if the player is aiming up or not. 
+    #                             #this makes it so it doesn't update mid attack and mess up the code
+
+        
+        
+    #     else: #if the player isn't holding down any key, even if they have already inputted 'up' or 'down' before, it would reset the aim
+    #         player.aim_up = False
+    #         player.aim_down = False
 
 
 
@@ -1134,10 +1173,12 @@ while True:
     zomb_no = 0
     del_zomb = None
     player_damage = 0
+    total_damage = 0
     player.check_cooldown()
     for zombie in zombies:
-        zombie.damaged, applied_damage = player.attack(zombie.damaged, zombie.rect, player_damage)
         player.update_attack_hitbox()
+        zombie.damaged, applied_damage = player.attack(zombie.damaged, zombie.rect, player_damage)
+        total_damage += applied_damage
         zombie.receive_damage(applied_damage)
         zombie.calculate_knockback(player.mom_force, player.x_flip, player.rect)
         zombie.check_staggered()
@@ -1146,6 +1187,8 @@ while True:
             zombies.pop(del_zomb)
         zomb_no += 1
 
+    screen_shake_x, screen_shake_y = player.calculate_screen_shake(total_damage, screen_shake_x, screen_shake_y)
+    
         
 
 
@@ -1410,6 +1453,7 @@ while True:
  #----------------------------------------------------------------------------------------------------------
 
 
+
     # void
     if player.rect.y > 2000:
         player.rect.x, player.rect.y = 250,100
@@ -1502,13 +1546,22 @@ while True:
                 y_camera_delay = 0
 
 
+    if abs(screen_shake_x) > 0:
+        screen_shake_x *= 0.85
+        if abs(screen_shake_x) < 0.1:
+            screen_shake_x = 0
+
+    if abs(screen_shake_y) > 0:
+        screen_shake_y *= 0.85
+        if abs(screen_shake_y) < 0.5:
+            screen_shake_y = 0
 
 
     for (chunk_x,chunk_y), tile_map in loaded_chunks.items():
         chunk_world_x = chunk_x * chunk_pixel_w
         chunk_world_y = chunk_y * chunk_pixel_h
-        tile_map.draw_map(canvas, (camera_x + x_camera_delay), (camera_y + y_camera_delay) ,offset_x=chunk_world_x,offset_y=chunk_world_y)
-    #                                        ^positive map delay           ^
+        tile_map.draw_map(canvas, (camera_x + x_camera_delay + screen_shake_x), (camera_y + y_camera_delay + screen_shake_y) ,offset_x=chunk_world_x,offset_y=chunk_world_y)
+    #                                        ^positive map delay                                     ^
 
 
      
@@ -1516,11 +1569,11 @@ while True:
     # player_render_pos = ((player.rect.x- camera_x) - x_camera_delay - 48, (player.rect.y-  camera_y) - y_camera_delay -48) #centers player on screen
     # #                                                                                                   ^negative camera delay
 
-    player_render_pos = (player.rect.centerx -64 - camera_x - x_camera_delay, player.rect.bottom - 80 - camera_y - y_camera_delay)
+    player_render_pos = (player.rect.centerx -64 - camera_x - x_camera_delay - screen_shake_x, player.rect.bottom - 80 - camera_y - y_camera_delay - screen_shake_y)
 
     #zombie render code
     for zombie in zombies:
-        zombie.render_pos = ((zombie.rect.x - camera_x) - x_camera_delay, (zombie.rect.y - camera_y) - y_camera_delay)
+        zombie.render_pos = ((zombie.rect.x - camera_x) - x_camera_delay - screen_shake_x, (zombie.rect.y - camera_y) - y_camera_delay - screen_shake_y) 
     #                                                                                                   ^negative camera delay
         #disables zombie gravity if out of range
         if zombie.render_pos[0] < position_chunk_x:
