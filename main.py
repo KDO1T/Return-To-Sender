@@ -138,17 +138,29 @@ render_distance = 2
 player = Player(
     Name=None,
     rect = pygame.Rect(100, 200, 32, 32),
+    attack_rect = pygame.Rect(0, 0, 0, 0),
     movement=[0,0],
     moving_up = False,
     moving_down = False,
     moving_right = False,
     moving_left = False,
+    dash = False,
+    dashing = False,
+    dash_buffer = 0,
+    max_dash_buffer = 120,
+    max_dash_charges = 2,
+    dash_charges = 2,
+    dash_dis = 15,
+    dash_counter = 0,
     press_space = False,
+    hor_aim_list = [],
+    vert_aim_list = [],
     aim_up = False,
     aim_down = False,
     aim_right = False,
     aim_left = False,
     y_momentum = 0,
+    x_momentum = 0,
     max_air_jumps = 2,
     jump = False,
     jump_height = 4.5,
@@ -160,18 +172,16 @@ player = Player(
     animation_mode = 0,
     animation_count = 0,    
     max_HP = 50,
+    i_counter = 0,
+    invulnerable= False,
     damaged=False,
     base_ATK=5, 
-    attack_dir = None,
-    first_hit_count = 0,
-    combo_tick = 0,
-    combo_stage = 0,
-    first_hit_cooldown = 120,
-    combo_cooldown = 20,
-    combo_window = 0,
-    max_combo_window = 25,
     attacking = False,
+    holding_attack = False,
     attacked = False,
+    attack_count = 0,
+    combo_stage = 1,
+    combo_buffer= 0,
     CRIT_DMG=None, 
     CRIT_CHANCE=None, 
     LEVEL=None, 
@@ -181,6 +191,10 @@ player = Player(
 )
 
 player_rect = player.rect
+player.hor_aim_list.append('right')
+player.hor_aim_list.append('right')
+player.vert_aim_list.append('up')
+player.vert_aim_list.append('up')
 
 # *--------------------------------------------ENTITIES-------------------------------------------------------*
 
@@ -192,35 +206,104 @@ zombie_sprite = pygame.image.load('animations/base_zombie.png')
 
 # *------------------------------ANIMATION------------------------------------------------------------------------
 
-jimmy_sheet = Spritesheet('animations/spritesheets/red_jimmy_sheet2.png')
+jimmy_sheet = Spritesheet('animations/spritesheets/jimmy_sheet.png')
+
+#LOAD PLAYER ANIMATIONS:
+
+#idle
+for i in range(12):# 0:11, mode 0
+    filename = f'idle_right_{i}'
+    player.all_frames.append(jimmy_sheet.parse_sprite(filename))
+for i in range(12):# 12:23, mode 1
+    filename = f'idle_left_{i}'
+    player.all_frames.append(jimmy_sheet.parse_sprite(filename))
+#standing attack
+for i in range(12):# 24:35, mode 2
+    filename = f'attack_right_{i}'
+    player.all_frames.append(jimmy_sheet.parse_sprite(filename))
+for i in range(12):# 36:47, mode 3
+    filename = f'attack_left_{i}'
+    player.all_frames.append(jimmy_sheet.parse_sprite(filename))
+#jumping/falling
+for i in range(4):# 48:51, mode 4
+    filename = f'jump_right_{i}'
+    player.all_frames.append(jimmy_sheet.parse_sprite(filename))
+for i in range(4):# 52:55, mode 5
+    filename = f'jump_left_{i}'
+    player.all_frames.append(jimmy_sheet.parse_sprite(filename))
+#attacking while jumping
+for i in range(12):# 56:67, mode 6
+    filename = f'jump_attack_right_{i}'
+    player.all_frames.append(jimmy_sheet.parse_sprite(filename))
+for i in range(12):# 68:79, mode 7
+    filename = f'jump_attack_left_{i}'
+    player.all_frames.append(jimmy_sheet.parse_sprite(filename))
+#attacking up while jumping
+for i in range(4):# 80:83, mode 8
+    filename = f'jump_upattack_right_{i}'
+    player.all_frames.append(jimmy_sheet.parse_sprite(filename))
+for i in range(4):# 84:87, mode 9
+    filename = f'jump_upattack_left_{i}'
+    player.all_frames.append(jimmy_sheet.parse_sprite(filename))
+#attacking up while standing
+for i in range(4):# 88:91, mode 10
+    filename = f'upattack_right_{i}'
+    player.all_frames.append(jimmy_sheet.parse_sprite(filename))
+for i in range(4):# 92:95, mode 11
+    filename = f'upattack_left_{i}'
+    player.all_frames.append(jimmy_sheet.parse_sprite(filename))
+#attacking down while jumping
+for i in range(4):# 96:99, mode 12
+    filename = f'jump_downattack_right_{i}'
+    player.all_frames.append(jimmy_sheet.parse_sprite(filename))
+for i in range(4):# 100:103, mode 13
+    filename = f'jump_downattack_left_{i}'
+    player.all_frames.append(jimmy_sheet.parse_sprite(filename))
+#walking 
+for i in range(6):# 104:109, mode 14
+    filename = f'walk_right_{i}'
+    player.all_frames.append(jimmy_sheet.parse_sprite(filename))
+for i in range(6):# 110:115, mode 15
+    filename = f'walk_left_{i}'
+    player.all_frames.append(jimmy_sheet.parse_sprite(filename))
+#dashing
+for i in range(4):# 116:119, mode 16
+    filename = f'dash_right_{i}'
+    player.all_frames.append(jimmy_sheet.parse_sprite(filename))
+for i in range(4):# 120:123, mode 17
+    filename = f'dash_left_{i}'
+    player.all_frames.append(jimmy_sheet.parse_sprite(filename))
+
+
+
 
 
 # 0-5 idle, 6-10 walk, 11-14 jump, 15-17 fall
 # -idle
 # LOAD PLAYER ANIMATIONS      
-for i in range(6):
-    filename = f'idle_{i}'
-    player.all_frames.append(jimmy_sheet.parse_sprite(filename))
+# for i in range(6):
+#     filename = f'idle_{i}'
+#     player.all_frames.append(jimmy_sheet.parse_sprite(filename))
 
-# -walk
-for i in range(5):
-    filename = f'walk_{i}'
-    player.all_frames.append(jimmy_sheet.parse_sprite(filename))
+# # -walk
+# for i in range(5):
+#     filename = f'walk_{i}'
+#     player.all_frames.append(jimmy_sheet.parse_sprite(filename))
 
-# -jump
-for i in range(4):
-    filename = f'jump_{i}'
-    player.all_frames.append(jimmy_sheet.parse_sprite(filename))
+# # -jump
+# for i in range(4):
+#     filename = f'jump_{i}'
+#     player.all_frames.append(jimmy_sheet.parse_sprite(filename))
 
-# -fall
-for i in range(3):
-    filename = f'fall_{i}'
-    player.all_frames.append(jimmy_sheet.parse_sprite(filename))
+# # -fall
+# for i in range(3):
+#     filename = f'fall_{i}'
+#     player.all_frames.append(jimmy_sheet.parse_sprite(filename))
 
-# -fall
-for i in range(3):
-    filename = f'attack_{i}'
-    player.all_frames.append(jimmy_sheet.parse_sprite(filename))
+# # -fall
+# for i in range(3):
+#     filename = f'attack_{i}'
+#     player.all_frames.append(jimmy_sheet.parse_sprite(filename))
 
 # 0-5 idle, 6-10 walk, 11-14 jump, 15-17 fall, 18-20 attack
 # 0=idle, 1=walk, 2=jump, 3=fall
@@ -579,9 +662,9 @@ while True:
         # *--WINDOW CONTROLS--*
 
         if event.type == pygame.MOUSEBUTTONDOWN:
-            player.attacking = True
+            player.holding_attack = True
         if event.type == pygame.MOUSEBUTTONUP:
-            player.attacking = False
+            player.holding_attack = False
 
         if event.type == VIDEORESIZE and status == RESIZABLE:
             window_w, window_h = event.w , event.h
@@ -602,37 +685,59 @@ while True:
 
 
             # *--KEY PRESSED--*
+        
+
+
+        hor_recently_aimed = player.hor_aim_list[-1] #to prevent double input
+        vert_recentely_aimed = player.vert_aim_list[-1] #to prevent double input
+
+    
+
         if event.type == pygame.KEYDOWN:
             if event.key == control_keys["up"]: #pressing W (up)
                 player.aim_up = True
+                player.aim_down = False
+    
+
             if event.key == control_keys["left"]: #pressing A (left)
                 player.moving_left = True
-                player.aim_left = True
+                if 'left' not in hor_recently_aimed:
+                    player.hor_aim_list.append('left')
+
             if event.key == control_keys["down"]: #pressing S (down)
                 player.aim_down = True
+                player.aim_up = False
+
+               
             if event.key == control_keys["right"]: #pressing D (right)
                 player.moving_right = True
-                player.aim_right = True
+                if 'right' not in hor_recently_aimed:
+                    player.hor_aim_list.append('right')
+
+
             if event.key == control_keys["jump"]:
                 player.press_space = True
 
-
+            if event.key == pygame.K_LCTRL:
+                player.dash = True
+            
 
             # *--KEY IS LET GO--*  
         if event.type == pygame.KEYUP:
 
-            if event.key == control_keys["left"] and event.key == control_keys["right"] and event.key == control_keys["jump"]: #nothing is being touched
-                player.animation_mode = 0  
+
             if event.key == control_keys["up"]:#let go of W (up)
                 player.aim_up = False
+
             if event.key == control_keys["left"]: #let go of A (left)
                 player.moving_left = False
-                player.aim_left = False
+    
             if event.key == control_keys["down"]:#let go of S (down)
                 player.aim_down = False
+            
             if event.key == control_keys["right"]: #let go of D (right)
                 player.moving_right = False
-                player.aim_right = False
+            
             
   
 
@@ -835,23 +940,120 @@ while True:
             stage_spawned_zombies += 1
     zombie_count = len(zombies)
 
+
+
+
+    # *---------------------------------------------------------------------------
+    # *--PLAYER AIM CODE--*
     
+    #hard locks the player to face one direction:
+    
+    #ensures only 2 states are contained within each list as to not flood the memory
+
+
+ 
+    if len(player.hor_aim_list) > 2:
+        player.hor_aim_list.pop(0)
+
+    if player.hor_aim_list[-1] == 'right':
+        player.aim_right = True
+        player.aim_left = False
+
+    if player.hor_aim_list[-1] == 'left':
+        player.aim_left = True
+        player.aim_right = False
+
+    # #later change the aim up and down code to only function/end when the moves are used
+    # if len(player.vert_aim_list) > 3 :
+    #     player.vert_aim_list.pop(0)
+
+    # if player.vert_aim_list[-1] == 'up':
+    #     player.aim_up = True
+    #     player.aim_down = False
+
+    # if player.vert_aim_list[-1] == 'down':
+    #     player.aim_down = True
+    #     player.aim_up = False
+
+    # if player.vert_aim_list[-1] == 'still':
+    #     pass
+
+
+
+
+
+        
+
+  
+    
+
+
+    
+
+    
+
+
+
+
+
+
+
 
 
     # *---------------------------------------------------------------------------
 
     # *--PLAYER HORIZONTAL MOVEMENT + COLLISIONS--*
 
+    player.init_dash()
+
+
+
     player.movement = [0,0]  
+    if player.dashing is True:
+        if player.aim_right is True:
+            dash_force = player.dash_dis
+            if abs(dash_force) > 0:
+                dash_force *= 0.85
+            
+                if abs(dash_force) < 0.1: #if its near 0, its negligible so make it zero
+                    dash_force = 0
+            
+            player.movement[0]=dash_force 
+            player.rect.x += player.movement[0]
 
-    #left and right movement
-    if player.moving_right == True:
-        player.movement[0]= 4
-        player.rect.x += player.movement[0]
+        if player.aim_left is True:
+            dash_force = player.dash_dis
+            if abs(dash_force) > 0:
+                dash_force *= 0.85
+            
+                if abs(dash_force) < 0.1: #if its near 0, its negligible so make it zero
+                    dash_force = 0
+            
+            player.movement[0]=-dash_force 
+            player.rect.x += player.movement[0]
+    else:
 
-    if player.moving_left == True:
-        player.movement[0]= -4
-        player.rect.x += player.movement[0]
+        #left and right movement   
+        if player.attacking is True: #slow down movement if the player is attacking
+            if player.moving_right == True:
+                player.movement[0]= 1
+                player.rect.x += player.movement[0]
+
+            if player.moving_left == True:
+                player.movement[0]= -1
+                player.rect.x += player.movement[0] 
+                player.rect.x -= (player.hit_number % 3)*2
+
+        else:
+            if player.moving_right == True:
+                player.movement[0]= 4
+                player.rect.x += player.movement[0]
+
+            if player.moving_left == True:
+                player.movement[0]= -4
+                player.rect.x += player.movement[0]
+
+
 
     #collisions
     for tile in tile_rect:    
@@ -887,18 +1089,22 @@ while True:
     
     #PLAYER
     #gravity
-    player.movement[1] = player.y_momentum
-    
-    player.y_momentum += 0.2
-    if player.y_momentum > 10:
-        player.y_momentum = 10
-
-    if player.y_momentum >= 0 and player.y_momentum <= 1: #checks if player is in the air
-        pass
+    if player.dashing is True:
+        player.y_momentum = 0
+        pass #ignore gravity while dashing
     else:
-        player.on_ground = False
+        player.movement[1] = player.y_momentum
+        
+        player.y_momentum += 0.2
+        if player.y_momentum > 10:
+            player.y_momentum = 10
 
-    player.rect.y += player.movement[1]
+        if player.y_momentum >= 0 and player.y_momentum <= 1: #checks if player is in the air
+            pass
+        else:
+            player.on_ground = False
+
+        player.rect.y += player.movement[1]
 
     
 
@@ -930,23 +1136,27 @@ while True:
     #                    *--JUMP--*
     
     #positive y momentum is downward | negative y momentum is upward
-    if player.press_space == True:
-        if player.on_ground is True: #player touching ground
-            player.jump = True
-            player.air_jump_count = player.max_air_jumps
-        else: #player is in the air
-            if player.air_jump_count > 0: #if player has an extra jump, then jump then deduct from remaining jumps
-                player.jump = True
-                player.air_jump_count -= 1
-            else:
-                pass
+    if player.dashing is True:
+        player.y_momentum = 0
+        pass #ignore while dashing
     else:
-         pass
+        if player.press_space == True:
+            if player.on_ground is True: #player touching ground
+                player.jump = True
+                player.air_jump_count = player.max_air_jumps
+            else: #player is in the air
+                if player.air_jump_count > 0: #if player has an extra jump, then jump then deduct from remaining jumps
+                    player.jump = True
+                    player.air_jump_count -= 1
+                else:
+                    pass
+        else:
+            pass
 
-    player.press_space = False #just returns it back to the original state so it doesn't infintely jump
+        player.press_space = False #just returns it back to the original state so it doesn't infintely jump
 
-    if player.jump == True:
-        player.y_momentum = -player.jump_height
+        if player.jump == True:
+            player.y_momentum = -player.jump_height
 
 # *---------------------------------------ENTITIES---------------------------------------------------------*
 
@@ -957,6 +1167,7 @@ while True:
     player.check_cooldown()
     for zombie in zombies:
         zombie.damaged, applied_damage = player.attack(zombie.damaged, zombie.rect, player_damage)
+        player.update_attack_hitbox()
         zombie.receive_damage(applied_damage)
         zombie.calculate_knockback(player.mom_force, player.x_flip, player.rect)
         zombie.check_staggered()
@@ -1006,7 +1217,7 @@ while True:
 
     for zombie in zombies:
         try:#because initially player_render_pos hasn't been defined yet
-            zombie.aggro_player(player_render_pos) 
+            zombie.aggro_player((player.rect.centerx, player.rect.centery)) 
         except NameError:
             pass
     
@@ -1036,11 +1247,11 @@ while True:
                 if zombie.chase_player == True: #chase player
 
                     try:
-                        if zombie.render_pos > player_render_pos:
+                        if zombie.rect.centerx > player.rect.centerx:
                             zombie.movement[0] = -zombie.chase_speed
                             zombie.rect.x += zombie.movement[0]
 
-                        if zombie.render_pos < player_render_pos:
+                        if zombie.rect.centerx < player.rect.centerx:
                             zombie.movement[0] = zombie.chase_speed
                             zombie.rect.x += zombie.movement[0]
                             
@@ -1134,20 +1345,100 @@ while True:
  #-----------------------------------------------------------------------------------------------------
     #chooses what type of action the player is doing to then determine animation playing
 
-    if player.attacking:
+
+    #dashing
+    if player.dashing == True and player.aim_right: 
+        player.animation_mode = 16
+
+    #dashing
+    elif player.dashing == True and player.aim_left: 
+        player.animation_mode = 17
+
+    #attacking up while falling
+    elif player.on_ground == False and player.y_momentum > 0 and player.attacking and player.aim_up and player.aim_right:#right
+        player.animation_mode = 8
+    elif player.on_ground == False and player.y_momentum > 0 and player.attacking and player.aim_up and player.aim_left:#left
+        player.animation_mode = 9
+    
+    #attacking down while falling
+    elif player.on_ground == False and player.y_momentum > 0 and player.attacking and player.aim_down and player.aim_right:#right
+        player.animation_mode = 12
+    elif player.on_ground == False and player.y_momentum > 0 and player.attacking and player.aim_down and player.aim_left:#left
+        player.animation_mode = 13
+
+    #attacking while falling 
+    elif player.on_ground == False and player.attacking and player.aim_right:#right
+        player.animation_mode = 6
+    elif player.on_ground == False and player.attacking and player.aim_left:#left
+        player.animation_mode = 7
+
+            
+    #falling
+    elif player.on_ground == False and player.y_momentum > 0 and player.aim_right: #right 
         player.animation_mode = 4
-    elif player.on_ground == False and player.y_momentum > 0: #falling animation
-        player.animation_mode = 3
-    elif player.on_ground == False and player.y_momentum <= 0: #jumping animation
+    elif player.on_ground == False and player.y_momentum > 0 and player.aim_left:#left
+        player.animation_mode = 5
+
+    #attacking up while jumping
+    elif player.on_ground == False and player.y_momentum <= 0 and player.attacking and player.aim_up and player.aim_right:#right
+        player.animation_mode = 8
+    elif player.on_ground == False and player.y_momentum <= 0 and player.attacking and player.aim_up and player.aim_left:#left
+        player.animation_mode = 9
+
+    #attacking down while jumping
+    elif player.on_ground == False and player.y_momentum <= 0 and player.attacking and player.aim_down and player.aim_right:#right
+        player.animation_mode = 12
+    elif player.on_ground == False and player.y_momentum <= 0 and player.attacking and player.aim_down and player.aim_left:#left
+        player.animation_mode = 13
+        
+    #attacking while jumping 
+    elif player.on_ground == False and player.attacking and player.aim_right:#right
+        player.animation_mode = 6
+    elif player.on_ground == False and player.attacking and player.aim_left:#left
+        player.animation_mode = 7
+
+   
+
+    #jumping   
+    elif player.on_ground == False and player.y_momentum <= 0 and player.aim_right:#right
+        player.animation_mode = 4
+    elif player.on_ground == False and player.y_momentum <= 0 and player.aim_left:#left
+        player.animation_mode = 5
+
+     #attacking up while standing
+    elif player.attacking and player.aim_up and player.aim_right:#right
+        player.animation_mode = 10
+    elif player.attacking and player.aim_up and player.aim_left:#left
+        player.animation_mode = 11
+    
+
+    #attacking horizontally while standing
+    elif player.attacking and player.aim_right:#right
         player.animation_mode = 2
-    elif player.moving_right or player.moving_left:
-        player.animation_mode = 1
-    else: #idle
+    elif player.attacking and player.aim_left:#left
+        player.animation_mode = 3 
+
+   
+    #walking
+    elif player.moving_right:#right
+        player.animation_mode = 14
+    elif player.moving_left:#left
+        player.animation_mode = 15
+
+    #idle
+    elif player.aim_right:#right
         player.animation_mode = 0
+    elif player.aim_left:#left
+        player.animation_mode = 1
+
+    else: 
+        player.animation_mode = 0
+
 
 
                                 # *--RENDERING--*
  #----------------------------------------------------------------------------------------------------------
+
 
     # void
     if player.rect.y > 2000:
@@ -1157,9 +1448,11 @@ while True:
 
     # *--CAMERA MOVEMENT--*
     #these 2 centers the player within the base canvas
-    camera_x = player.rect.centerx - (base_res_x // 2) 
-    camera_y = player.rect.centery - (base_res_y // 2)
 
+    camera_x = player.rect.centerx - (base_res_x // 2)
+    camera_y = player.rect.centery - (base_res_y // 2) 
+
+    
      #map clamping      
     max_camera_x = max_world_chunks - base_res_x
     camera_x = max(min_world_chunks, min(camera_x, max_camera_x))
@@ -1252,8 +1545,11 @@ while True:
         
         obstacle.draw(canvas, camera_x, camera_y, x_camera_delay, y_camera_delay)
     
-    player_render_pos = ((player.rect.x - camera_x) - x_camera_delay, (player.rect.y - camera_y) - y_camera_delay) #centers player on screen
-    #                                                                                                   ^negative camera delay
+    # player_render_pos = ((player.rect.x- camera_x) - x_camera_delay - 48, (player.rect.y-  camera_y) - y_camera_delay -48) #centers player on screen
+    # #                                                                                                   ^negative camera delay
+
+    player_render_pos = (player.rect.centerx -64 - camera_x - x_camera_delay, player.rect.bottom - 80 - camera_y - y_camera_delay)
+
     #zombie render code
     for zombie in zombies:
         zombie.render_pos = ((zombie.rect.x - camera_x) - x_camera_delay, (zombie.rect.y - camera_y) - y_camera_delay)
@@ -1281,11 +1577,21 @@ while True:
         else:
             zombie.x_flip = False
 
- 
-    player.current_frames = player.update_action() #determines the current type of animation playing
-    player.update_player_frame() #update frame played
+    
+    player.current_frames = player.update_action() #determines the current type of animation playing only if the animation mode changes
+    player.update_player_frame() #update frame played and returns the animation mode
     player_sprite = player.current_frames[player.frame_index] #determines the image/sprite which will be displayed on player pos
-    canvas.blit(pygame.transform.flip(player_sprite, player.x_flip, False), player_render_pos) 
+    canvas.blit(player_sprite, player_render_pos) 
+
+
+    # pygame.draw.rect(canvas, (255,0,0), player.attack_rect)
+    pygame.draw.rect(canvas, (255, 0, 0), (player.attack_rect.x - camera_x - x_camera_delay, player.attack_rect.y - camera_y -y_camera_delay, player.attack_rect.width, player.attack_rect.height), 2)
+
+    #new player render code:
+
+    # above this will be the code determining the sprite and rect
+    # canvas.blit(player_sprite, player_render_pos)
+    #                  ^ x_flip will be used in here not in the actual rendering
 
 
     for zombie in zombies:
