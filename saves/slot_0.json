@@ -4,7 +4,7 @@
     "brightness": 50,
     "player": {
         "Name": null,
-        "HP": -2960,
+        "HP": -3709,
         "max_HP": 50,
         "base_ATK": 5,
         "CRIT_DMG": null,
@@ -15,13 +15,13 @@
         "S_COIN": null
     },
     "position": {
-        "x": 3841,
-        "y": 192
+        "x": 611,
+        "y": 258
     },
     "world": {
         "current_stage": 1,
         "map_seed": 7447,
         "spritesheet": "grass_spritesheet.png",
-        "zombie_count": 6
+        "zombie_count": 3
     }
 }

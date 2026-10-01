@@ -143,7 +143,12 @@ player = Player(
     moving_down = False,
     moving_right = False,
     moving_left = False,
+    dash = False,
     dashing = False,
+    dash_buffer = 0,
+    max_dash_buffer = 120,
+    max_dash_charges = 2,
+    dash_charges = 2,
     dash_dis = 15,
     dash_counter = 0,
     press_space = False,
@@ -154,6 +159,7 @@ player = Player(
     aim_right = False,
     aim_left = False,
     y_momentum = 0,
+    x_momentum = 0,
     max_air_jumps = 2,
     jump = False,
     jump_height = 4.5,
@@ -165,6 +171,8 @@ player = Player(
     animation_mode = 0,
     animation_count = 0,    
     max_HP = 50,
+    i_counter = 0,
+    invulnerable= False,
     damaged=False,
     base_ATK=5, 
     attacking = False,
@@ -687,6 +695,7 @@ while True:
             if event.key == control_keys["up"]: #pressing W (up)
                 player.aim_up = True
                 player.aim_down = False
+    
 
             if event.key == control_keys["left"]: #pressing A (left)
                 player.moving_left = True
@@ -696,6 +705,7 @@ while True:
             if event.key == control_keys["down"]: #pressing S (down)
                 player.aim_down = True
                 player.aim_up = False
+
                
             if event.key == control_keys["right"]: #pressing D (right)
                 player.moving_right = True
@@ -707,7 +717,7 @@ while True:
                 player.press_space = True
 
             if event.key == pygame.K_LCTRL:
-                player.dashing = True
+                player.dash = True
             
 
             # *--KEY IS LET GO--*  
@@ -722,7 +732,7 @@ while True:
     
             if event.key == control_keys["down"]:#let go of S (down)
                 player.aim_down = False
-
+            
             if event.key == control_keys["right"]: #let go of D (right)
                 player.moving_right = False
             
@@ -942,20 +952,20 @@ while True:
         player.aim_left = True
         player.aim_right = False
 
-    #later change the aim up and down code to only function/end when the moves are used
-    if len(player.vert_aim_list) > 3 :
-        player.vert_aim_list.pop(0)
+    # #later change the aim up and down code to only function/end when the moves are used
+    # if len(player.vert_aim_list) > 3 :
+    #     player.vert_aim_list.pop(0)
 
-    if player.vert_aim_list[-1] == 'up':
-        player.aim_up = True
-        player.aim_down = False
+    # if player.vert_aim_list[-1] == 'up':
+    #     player.aim_up = True
+    #     player.aim_down = False
 
-    if player.vert_aim_list[-1] == 'down':
-        player.aim_down = True
-        player.aim_up = False
+    # if player.vert_aim_list[-1] == 'down':
+    #     player.aim_down = True
+    #     player.aim_up = False
 
-    if player.vert_aim_list[-1] == 'still':
-        pass
+    # if player.vert_aim_list[-1] == 'still':
+    #     pass
 
 
 
@@ -982,6 +992,10 @@ while True:
     # *---------------------------------------------------------------------------
 
     # *--PLAYER HORIZONTAL MOVEMENT + COLLISIONS--*
+
+    player.init_dash()
+
+
 
     player.movement = [0,0]  
     if player.dashing is True:
@@ -1016,7 +1030,9 @@ while True:
 
             if player.moving_left == True:
                 player.movement[0]= -1
-                player.rect.x += player.movement[0]
+                player.rect.x += player.movement[0] 
+                player.rect.x -= (player.hit_number % 3)*2
+
         else:
             if player.moving_right == True:
                 player.movement[0]= 4
@@ -1025,6 +1041,8 @@ while True:
             if player.moving_left == True:
                 player.movement[0]= -4
                 player.rect.x += player.movement[0]
+
+
 
     #collisions
     for tile in tile_rect:    
