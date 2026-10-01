@@ -141,6 +141,7 @@ player = Player(
     Name=None,
     rect = pygame.Rect(100, 200, 32, 32),
     attack_rect = pygame.Rect(0, 0, 0, 0),
+    critical_rect = pygame.Rect(0,0,0,0),
     movement=[0,0],
     moving_up = False,
     moving_down = False,
@@ -931,12 +932,13 @@ while True:
                 spawn_y = 100
 
                 new_zombie = Zombie(
-                    pygame.Rect(spawn_x, spawn_y, 32 ,32),
+                    pygame.Rect(spawn_x, spawn_y, 32 ,32), None,
                     [0,0], 0 , 0 , 0, False, (0,0), False, 
                     'Still', False, random.randint(1,3), 0,
                     False, False, False, 0, 45, int(current_stage*5 + 15), 
                     int(current_stage*2 + 5)
                 )
+                new_zombie.head_rect = new_zombie.generate_head_rect() #make head rect for critical hit
                 zombies.append(new_zombie)
             stage_spawned_zombies += 1
     zombie_count = len(zombies)
@@ -967,11 +969,12 @@ while True:
         player.vert_aim_list.pop(0)
 
     if not player.attacking:
-        # Free movement aim updates when idle/moving
+        # if player is not attacking, it will decide their vertical direction like normal
         player.aim_up = player.holding_up and player.vert_aim_list[-1] == 'up'
         player.aim_down = player.holding_down and player.vert_aim_list[-1] == 'down'
     else:
-        # Mid-attack queue resolution at completion checkpoints (0, 19, 39, 59)
+        # 0, 19, 39, and 59 represents the points where an animation is about to start/finished. meaning up and down only play when a full swing
+        #is animated
         if player.attack_count in (0, 19, 39, 59):
             if player.holding_up and player.vert_aim_list[-1] == 'up':
                 player.aim_up = True
@@ -982,35 +985,6 @@ while True:
             else:
                 player.aim_up = False
                 player.aim_down = False
-
-
-
-    # if player.attacking == True: #if the player is attacking and the player has recently done an attack, then the player can switch to up or down
-    #     if player.attack_count in (5,25,45):
-    #         if player.holding_up and player.vert_aim_list[-1] == 'up':
-    #             player.aim_up = True
-    #             player.aim_down = False
-    
-    #         elif player.holding_down and player.vert_aim_list[-1] == 'down':
-    #             player.aim_down = True
-    #             player.aim_up = False
-
-
-    # else:#if the player isn't attacking then it will reset
-    #     player.aim_up = False
-    #     player.aim_down = False
-            
-
-
-    # if player.attacking != True: #basically when the player is not attacking it would determine if the player is aiming up or not. 
-    #                             #this makes it so it doesn't update mid attack and mess up the code
-
-        
-        
-    #     else: #if the player isn't holding down any key, even if they have already inputted 'up' or 'down' before, it would reset the aim
-    #         player.aim_up = False
-    #         player.aim_down = False
-
 
 
 
@@ -1177,10 +1151,10 @@ while True:
         player.check_cooldown()
         for zombie in zombies:
             player.update_attack_hitbox()
-            zombie.damaged, applied_damage, hit_freeze_timer = player.attack(zombie.damaged, zombie.rect, player_damage, hit_freeze_timer)
+            zombie.damaged, applied_damage, hit_freeze_timer = player.attack(zombie.damaged, zombie.rect, zombie.head_rect,player_damage, hit_freeze_timer)
             total_damage += applied_damage
             zombie.receive_damage(applied_damage)
-            zombie.calculate_knockback(player.mom_force, player.x_flip, player.rect)
+            zombie.calculate_knockback(player.aim_up,player.aim_down, player.x_flip, player.rect, player.on_ground, player.mom_force, player.attack_count)
             zombie.check_staggered()
             del_zomb = zombie.dead_check(zomb_no)
             if del_zomb is not None:
@@ -1354,6 +1328,9 @@ while True:
                         zombie.y_momentum = 0 # <-- same with this
 
 
+        for zombie in zombies:
+            zombie.update_head_rect()
+
                                     # *--ANIMATION--*
     #-----------------------------------------------------------------------------------------------------
         #chooses what type of action the player is doing to then determine animation playing
@@ -1374,9 +1351,9 @@ while True:
             player.animation_mode = 9
         
         #attacking down while falling
-        elif player.on_ground == False and player.y_momentum > 0 and player.attacking and player.aim_down and player.aim_right:#right
+        elif player.on_ground == False and player.attacking and player.aim_down and player.aim_right:#right
             player.animation_mode = 12
-        elif player.on_ground == False and player.y_momentum > 0 and player.attacking and player.aim_down and player.aim_left:#left
+        elif player.on_ground == False and player.attacking and player.aim_down and player.aim_left:#left
             player.animation_mode = 13
 
         #attacking while falling 
@@ -1606,10 +1583,15 @@ while True:
 
 
     # pygame.draw.rect(canvas, (255,0,0), player.attack_rect)
+   
+    for zombie in zombies:
+        pygame.draw.rect(canvas, (0,255, 255), (zombie.rect.x - camera_x - x_camera_delay, zombie.rect.y - camera_y -y_camera_delay, zombie.rect.width, zombie.rect.height))
+    for zombie in zombies:
+        pygame.draw.rect(canvas, (0,0, 255), (zombie.head_rect.x - camera_x - x_camera_delay, zombie.head_rect.y - camera_y -y_camera_delay, zombie.head_rect.width, zombie.head_rect.height))
     pygame.draw.rect(canvas, (255, 0, 0), (player.attack_rect.x - camera_x - x_camera_delay, player.attack_rect.y - camera_y -y_camera_delay, player.attack_rect.width, player.attack_rect.height), 2)
-
+    pygame.draw.rect(canvas, (0, 255, 0), (player.critical_rect.x - camera_x - x_camera_delay, player.critical_rect.y - camera_y -y_camera_delay, player.critical_rect.width, player.critical_rect.height), 2)
+    
     #new player render code:
-
     # above this will be the code determining the sprite and rect
     # canvas.blit(player_sprite, player_render_pos)
     #                  ^ x_flip will be used in here not in the actual rendering

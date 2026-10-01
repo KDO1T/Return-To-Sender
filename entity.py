@@ -5,7 +5,7 @@ class Player:
     # *--STATS--*
     #level is the player's level, while exp is what the player gains to increase in level
     #dollars is the money the player gains throughout runs while s_coin (soul coins) is the metacurrency
-    def __init__(self, Name,rect,attack_rect,movement,moving_up,moving_down ,moving_right ,moving_left,dash, dashing,dash_dis,dash_counter, 
+    def __init__(self, Name,rect,attack_rect,critical_rect, movement,moving_up,moving_down ,moving_right ,moving_left,dash, dashing,dash_dis,dash_counter, 
                  hor_aim_list, holding_up, holding_down, vert_aim_list, aim_up,aim_down, dash_charges,max_dash_buffer,dash_buffer, 
                  max_dash_charges, aim_right, aim_left, press_space,
                   y_momentum,x_momentum, max_air_jumps,jump,jump_height,on_ground,x_flip, all_frames ,current_frames ,frame_index, animation_mode,
@@ -14,6 +14,7 @@ class Player:
         self.Name = Name
         self.rect = rect
         self.attack_rect = attack_rect #contains hitbox for each attack
+        self.critical_rect = critical_rect #contains smaller hitbox that if the player manages to hit, will boost his damage/knockback
         self.movement = movement
         self.moving_up = moving_up
         self.moving_down = moving_down
@@ -55,7 +56,7 @@ class Player:
         self.invulnerable = invulnerable 
         self.damaged = damaged
         self.base_ATK = base_ATK
-        self.mom_force = 5 #the momentum the player applies to zombies when knocking them back
+        self.mom_force = 10 #the momentum the player applies to zombies when knocking them back
         self.attacking = attacking
         self.holding_attack = holding_attack
         self.attacked = attacked
@@ -288,19 +289,6 @@ class Player:
 
 
 
-        
-
-        # if self.dashing is True:
-        #     self.i_counter += 1*self.dash_counter
-        # else:
-        #     if self.i_counter < 15:
-        #         self.i_counter += 1
-        #     else:
-
-
-        # if self.i_counter > 0:
-        #     self.invulnerable = True
-
 
    
     def update_attack_hitbox(self):
@@ -315,10 +303,12 @@ class Player:
                 else:
                     self.attack_rect = pygame.Rect(self.rect.x - 23, self.rect.top -10, 50, 40)
 
-            elif self.aim_down:
+            elif self.aim_down and not self.on_ground :
                 if face_right is True:
+                    self.critical_rect = pygame.Rect(self.rect.x +3 , self.rect.bottom + 5, 20,15)
                     self.attack_rect = pygame.Rect(self.rect.x - 20, self.rect.bottom - 15, 68, 36)
                 else:
+                    self.critical_rect = pygame.Rect(self.rect.x +11, self.rect.bottom + 5, 20,15)
                     self.attack_rect = pygame.Rect(self.rect.x - 10, self.rect.bottom - 15, 68, 36)
             
             else:
@@ -329,9 +319,10 @@ class Player:
                     self.attack_rect = pygame.Rect(self.rect.left-27, self.rect.y, 40, 32)
         else:
             self.attack_rect = pygame.Rect(0, 0, 0, 0)
+            self.critical_rect = pygame.Rect(0,0,0,0)
         
 
-    def attack(self,zombie_damaged, zombie_hitbox, player_damage, freeze_frame_counter):
+    def attack(self,zombie_damaged, zombie_hitbox, zombie_head_hitbox, player_damage, freeze_frame_counter):
         if self.attack_rect.colliderect(zombie_hitbox) and self.attacked is True:
             print('TAKE THAT')
 
@@ -342,10 +333,11 @@ class Player:
             self.attacked = False
             self.hit_landed = True
 
-            if player_damage > self.base_ATK*2: #if damage gets to double what the player is capable of, freeze frame increases
-                freeze_frame_counter = 6       
+            if self.critical_rect.colliderect(zombie_head_hitbox):
+                freeze_frame_counter = 5     
+                self.y_momentum = -3
             else:
-                freeze_frame_counter = 4
+                freeze_frame_counter = 3
 
             
 
@@ -404,9 +396,10 @@ zombies = []
 
 class Zombie:
 
-    def __init__(self, rect, movement, x_push_momentum, y_push_momentum, y_momentum, x_flip, render_pos, on_ground, idle_move, chase_player, chase_speed ,
+    def __init__(self, rect, head_rect, movement, x_push_momentum, y_push_momentum, y_momentum, x_flip, render_pos, on_ground, idle_move, chase_player, chase_speed ,
                  attack_count, knocked, damaged, staggered,stag_count,max_stag_count, HP, ATK):
         self.rect = rect
+        self.head_rect = head_rect
         self.movement = movement
         self.x_push_momentum = x_push_momentum
         self.y_push_momentum = y_push_momentum
@@ -429,8 +422,13 @@ class Zombie:
 
 
 
-    def generate_rect(self, i, player_current_chunk_x):
-        self.rect = pygame.Rect(((player_current_chunk_x + 640) + (i*30)), 50, 20,32)
+    def generate_head_rect(self):
+        head_height = int(self.rect.height * 0.10)
+        return pygame.Rect(self.rect.x, self.rect.y, 15, head_height)
+
+    def update_head_rect(self):
+        self.head_rect.x = self.rect.x + 8
+        self.head_rect.y = self.rect.y
 
     def aggro_player(self, player_position):
 
@@ -472,44 +470,130 @@ class Zombie:
 
 
 
-    def calculate_knockback(self, player_force, player_direction, player_rect ):
-        if self.knocked == True:
-            if player_direction == False: #facing right
-                self.rect.left = player_rect.right
-                self.x_push_momentum += player_force//3
-                self.y_push_momentum += -player_force//5
+    def calculate_knockback(self, up_force,down_force, player_x_direction, player_rect, mid_air, player_force, player_attack_count):
 
-            if player_direction == True: #facing left
-                self.rect.right = player_rect.left
-                self.x_push_momentum -= player_force//3
-                self.y_push_momentum += -player_force//5
+        if self.knocked == True:
+
+            if not mid_air: #air knockback 
+
+                if up_force == True:
+                    if player_x_direction == False: #facing right
+                        # self.rect.bottomleft = player_rect.topright
+                        self.x_push_momentum += player_force//5
+                        self.y_push_momentum += -player_force*1.5
+
+
+                    elif player_x_direction == True: #facing left
+                        # self.rect.bottomright = player_rect.topleft
+                        self.x_push_momentum -= player_force//5
+                        self.y_push_momentum += -player_force*1.5
+
+
+        
+                elif down_force == True:
+                    if player_x_direction == False: #facing right
+                        # self.rect.topleft = player_rect.bottomright
+                        self.x_push_momentum += 0
+                        self.y_push_momentum -= player_force//2
+
+                    elif player_x_direction == True: #facing left
+                        # self.rect.topright = player_rect.bottomleft
+                        self.x_push_momentum += 0
+                        self.y_push_momentum -= player_force//2
+                    
+                    
+                else: #horizontal
+                    if player_x_direction == False: #facing right
+                        # self.rect.bottomleft = player_rect.midright
+                        if player_attack_count >= 45: #light up, light side --> light-to-medium up, light side --> little up, a lot of side
+                            self.x_push_momentum += player_force*2
+                            self.y_push_momentum += -player_force//2
+
+                        elif player_attack_count >= 25:
+                            self.x_push_momentum += player_force//6
+                            self.y_push_momentum += -player_force//1.2
+
+
+                        elif player_attack_count >= 5: #light up, light side --> light-to-medium up, light side --> little up, a lot of up
+                            self.x_push_momentum += player_force//4
+                            self.y_push_momentum += -player_force*1.2
+
+
+
+                    elif player_x_direction == True: #facing left
+                        # self.rect.bottomright = player_rect.midleft
+                        if player_attack_count >= 45: #light up, light side --> light-to-medium up, light side --> little up, a lot of side
+                            self.x_push_momentum -= player_force*2
+                            self.y_push_momentum += -player_force//2
+
+                        elif player_attack_count >= 25:
+                            self.x_push_momentum -= player_force//6
+                            self.y_push_momentum += -player_force//1.2
+
+
+                        elif player_attack_count >= 5: #light up, light side --> light-to-medium up, light side --> little up, a lot of up
+                            self.x_push_momentum -= player_force//4
+                            self.y_push_momentum += -player_force*1.2
+                        
+        
+            else: #ground knockback
+    
+                if up_force == True:
+                    if player_x_direction == False: #facing right
+                        self.rect.bottomleft = player_rect.midright
+                        self.x_push_momentum += player_force//4
+                        self.y_push_momentum += -player_force
+
+
+                    elif player_x_direction == True: #facing left
+                        self.rect.bottomright = player_rect.midleft
+                        self.x_push_momentum -= player_force//4
+                        self.y_push_momentum += -player_force
+
+    
+                else: #horizontal
+                    if player_x_direction == False: #facing right
+                        if player_attack_count >= 45: #light up, light side --> light-to-medium up, light side --> little up, a lot of side
+                            self.x_push_momentum += player_force*2
+                            self.y_push_momentum += -player_force*1.5
+
+                        elif player_attack_count >= 25:
+                            self.x_push_momentum += player_force//6
+                            self.y_push_momentum += -player_force//1.2
+
+
+                        elif player_attack_count >= 5: #light up, light side --> light-to-medium up, light side --> little up, a lot of up
+                            self.rect.left = player_rect.right
+                            self.x_push_momentum += player_force//4
+                            self.y_push_momentum += -player_force
+
+
+                    elif player_x_direction == True: #facing left 
+                        if player_attack_count >= 45: #light up, light side --> light-to-medium up, light side --> little up, a lot of side
+                            self.x_push_momentum -= player_force*2
+                            self.y_push_momentum += -player_force*1.5
+
+                        elif player_attack_count >= 25:
+                            self.x_push_momentum -= player_force//6
+                            self.y_push_momentum += -player_force//1.2
+
+
+                        elif player_attack_count >= 5: #light up, light side --> light-to-medium up, light side --> little up, a lot of up
+                            self.rect.right = player_rect.left
+                            self.x_push_momentum -= player_force//4
+                            self.y_push_momentum += -player_force
+
+
+
 
             self.knocked = False
 
-
-
-        pass
-
     
-        # if self.knocked == True:
-    
-        #     if player_direction == False: #facing right
-        #         self.rect.left = player_rect.right
-        #         self.x_momentum += player_force//2
-        #         self.y_momentum += -player_force//10
-
-        #     if player_direction == True: #facing left
-        #         self.rect.right = player_rect.left
-        #         self.x_momentum -= player_force//2
-        #         self.y_momentum += -player_force//10
-
-            
-            
-        #     self.knocked = False #put this into Y knockback code
-        #     print('i got knocked')
+ 
 
     def check_staggered(self):
         if self.staggered is True:
+            self.attack_count = 0
             self.stag_count += 1
 
         if self.stag_count >= self.max_stag_count: #staggered for how long the zombie should be staggered for (base duration is 45 aka 3/4 sec)
