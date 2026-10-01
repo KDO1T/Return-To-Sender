@@ -144,6 +144,8 @@ player = Player(
     moving_right = False,
     moving_left = False,
     dashing = False,
+    dash_dis = 15,
+    dash_counter = 0,
     press_space = False,
     hor_aim_list = [],
     vert_aim_list = [],
@@ -683,8 +685,8 @@ while True:
 
         if event.type == pygame.KEYDOWN:
             if event.key == control_keys["up"]: #pressing W (up)
-                if 'up' not in vert_recentely_aimed:
-                    player.vert_aim_list.append('up')
+                player.aim_up = True
+                player.aim_down = False
 
             if event.key == control_keys["left"]: #pressing A (left)
                 player.moving_left = True
@@ -692,35 +694,38 @@ while True:
                     player.hor_aim_list.append('left')
 
             if event.key == control_keys["down"]: #pressing S (down)
-                if 'down' not in vert_recentely_aimed:
-                    player.vert_aim_list.append('down')
-
+                player.aim_down = True
+                player.aim_up = False
+               
             if event.key == control_keys["right"]: #pressing D (right)
                 player.moving_right = True
                 if 'right' not in hor_recently_aimed:
                     player.hor_aim_list.append('right')
 
+
             if event.key == control_keys["jump"]:
                 player.press_space = True
 
-
+            if event.key == pygame.K_LCTRL:
+                player.dashing = True
+            
 
             # *--KEY IS LET GO--*  
         if event.type == pygame.KEYUP:
 
 
             if event.key == control_keys["up"]:#let go of W (up)
-                pass
-                # player.aim_up = False
+                player.aim_up = False
+
             if event.key == control_keys["left"]: #let go of A (left)
                 player.moving_left = False
-                # player.aim_left = False
+    
             if event.key == control_keys["down"]:#let go of S (down)
-                pass
-                # player.aim_down = False
+                player.aim_down = False
+
             if event.key == control_keys["right"]: #let go of D (right)
                 player.moving_right = False
-                # player.aim_right = False
+            
             
   
 
@@ -938,7 +943,7 @@ while True:
         player.aim_right = False
 
     #later change the aim up and down code to only function/end when the moves are used
-    if len(player.vert_aim_list) > 2 :
+    if len(player.vert_aim_list) > 3 :
         player.vert_aim_list.pop(0)
 
     if player.vert_aim_list[-1] == 'up':
@@ -948,6 +953,9 @@ while True:
     if player.vert_aim_list[-1] == 'down':
         player.aim_down = True
         player.aim_up = False
+
+    if player.vert_aim_list[-1] == 'still':
+        pass
 
 
 
@@ -976,24 +984,47 @@ while True:
     # *--PLAYER HORIZONTAL MOVEMENT + COLLISIONS--*
 
     player.movement = [0,0]  
-
-    #left and right movement   
-    if player.attacking is True: #slow down movement if the player is attacking
-        if player.moving_right == True:
-            player.movement[0]= 1
+    if player.dashing is True:
+        if player.aim_right is True:
+            dash_force = player.dash_dis
+            if abs(dash_force) > 0:
+                dash_force *= 0.85
+            
+                if abs(dash_force) < 0.1: #if its near 0, its negligible so make it zero
+                    dash_force = 0
+            
+            player.movement[0]=dash_force 
             player.rect.x += player.movement[0]
 
-        if player.moving_left == True:
-            player.movement[0]= -1
+        if player.aim_left is True:
+            dash_force = player.dash_dis
+            if abs(dash_force) > 0:
+                dash_force *= 0.85
+            
+                if abs(dash_force) < 0.1: #if its near 0, its negligible so make it zero
+                    dash_force = 0
+            
+            player.movement[0]=-dash_force 
             player.rect.x += player.movement[0]
     else:
-        if player.moving_right == True:
-            player.movement[0]= 4
-            player.rect.x += player.movement[0]
 
-        if player.moving_left == True:
-            player.movement[0]= -4
-            player.rect.x += player.movement[0]
+        #left and right movement   
+        if player.attacking is True: #slow down movement if the player is attacking
+            if player.moving_right == True:
+                player.movement[0]= 1
+                player.rect.x += player.movement[0]
+
+            if player.moving_left == True:
+                player.movement[0]= -1
+                player.rect.x += player.movement[0]
+        else:
+            if player.moving_right == True:
+                player.movement[0]= 4
+                player.rect.x += player.movement[0]
+
+            if player.moving_left == True:
+                player.movement[0]= -4
+                player.rect.x += player.movement[0]
 
     #collisions
     for tile in tile_rect:    
@@ -1022,18 +1053,22 @@ while True:
     
     #PLAYER
     #gravity
-    player.movement[1] = player.y_momentum
-    
-    player.y_momentum += 0.2
-    if player.y_momentum > 10:
-        player.y_momentum = 10
-
-    if player.y_momentum >= 0 and player.y_momentum <= 1: #checks if player is in the air
-        pass
+    if player.dashing is True:
+        player.y_momentum = 0
+        pass #ignore gravity while dashing
     else:
-        player.on_ground = False
+        player.movement[1] = player.y_momentum
+        
+        player.y_momentum += 0.2
+        if player.y_momentum > 10:
+            player.y_momentum = 10
 
-    player.rect.y += player.movement[1]
+        if player.y_momentum >= 0 and player.y_momentum <= 1: #checks if player is in the air
+            pass
+        else:
+            player.on_ground = False
+
+        player.rect.y += player.movement[1]
 
     
 
@@ -1053,23 +1088,27 @@ while True:
     #                    *--JUMP--*
     
     #positive y momentum is downward | negative y momentum is upward
-    if player.press_space == True:
-        if player.on_ground is True: #player touching ground
-            player.jump = True
-            player.air_jump_count = player.max_air_jumps
-        else: #player is in the air
-            if player.air_jump_count > 0: #if player has an extra jump, then jump then deduct from remaining jumps
-                player.jump = True
-                player.air_jump_count -= 1
-            else:
-                pass
+    if player.dashing is True:
+        player.y_momentum = 0
+        pass #ignore while dashing
     else:
-         pass
+        if player.press_space == True:
+            if player.on_ground is True: #player touching ground
+                player.jump = True
+                player.air_jump_count = player.max_air_jumps
+            else: #player is in the air
+                if player.air_jump_count > 0: #if player has an extra jump, then jump then deduct from remaining jumps
+                    player.jump = True
+                    player.air_jump_count -= 1
+                else:
+                    pass
+        else:
+            pass
 
-    player.press_space = False #just returns it back to the original state so it doesn't infintely jump
+        player.press_space = False #just returns it back to the original state so it doesn't infintely jump
 
-    if player.jump == True:
-        player.y_momentum = -player.jump_height
+        if player.jump == True:
+            player.y_momentum = -player.jump_height
 
 # *---------------------------------------ENTITIES---------------------------------------------------------*
 
@@ -1079,8 +1118,9 @@ while True:
     player_damage = 0
     player.check_cooldown()
     for zombie in zombies:
-        # zombie.damaged, applied_damage = player.attack(zombie.damaged, zombie.rect, player_damage)
-        # zombie.receive_damage(applied_damage)
+        zombie.damaged, applied_damage = player.attack(zombie.damaged, zombie.rect, player_damage)
+        player.update_attack_hitbox()
+        zombie.receive_damage(applied_damage)
         zombie.calculate_knockback(player.mom_force, player.x_flip, player.rect)
         zombie.check_staggered()
         del_zomb = zombie.dead_check(zomb_no)
@@ -1257,25 +1297,14 @@ while True:
  #-----------------------------------------------------------------------------------------------------
     #chooses what type of action the player is doing to then determine animation playing
 
+
     #dashing
     if player.dashing == True and player.aim_right: 
         player.animation_mode = 16
 
     #dashing
-    if player.dashing == True and player.aim_left: 
+    elif player.dashing == True and player.aim_left: 
         player.animation_mode = 17
-
-    #falling
-    elif player.on_ground == False and player.y_momentum > 0 and player.aim_right: #right 
-        player.animation_mode = 4
-    elif player.on_ground == False and player.y_momentum > 0 and player.aim_left:#left
-        player.animation_mode = 5
-
-    #attacking while falling 
-    elif player.on_ground == False and player.y_momentum > 0 and player.attacking and player.aim_right:#right
-        player.animation_mode = 6
-    elif player.on_ground == False and player.y_momentum > 0 and player.attacking and player.aim_left:#left
-        player.animation_mode = 7
 
     #attacking up while falling
     elif player.on_ground == False and player.y_momentum > 0 and player.attacking and player.aim_up and player.aim_right:#right
@@ -1288,18 +1317,19 @@ while True:
         player.animation_mode = 12
     elif player.on_ground == False and player.y_momentum > 0 and player.attacking and player.aim_down and player.aim_left:#left
         player.animation_mode = 13
-        
-    #jumping   
-    elif player.on_ground == False and player.y_momentum <= 0 and player.aim_right:#right
-        player.animation_mode = 4
-    elif player.on_ground == False and player.y_momentum <= 0 and player.aim_left:#left
-        player.animation_mode = 5
 
-    #attacking while jumping 
-    elif player.on_ground == False and player.y_momentum <= 0 and player.attacking and player.aim_right:#right
+    #attacking while falling 
+    elif player.on_ground == False and player.attacking and player.aim_right:#right
         player.animation_mode = 6
-    elif player.on_ground == False and player.y_momentum <= 0 and player.attacking and player.aim_left:#left
+    elif player.on_ground == False and player.attacking and player.aim_left:#left
         player.animation_mode = 7
+
+            
+    #falling
+    elif player.on_ground == False and player.y_momentum > 0 and player.aim_right: #right 
+        player.animation_mode = 4
+    elif player.on_ground == False and player.y_momentum > 0 and player.aim_left:#left
+        player.animation_mode = 5
 
     #attacking up while jumping
     elif player.on_ground == False and player.y_momentum <= 0 and player.attacking and player.aim_up and player.aim_right:#right
@@ -1312,7 +1342,27 @@ while True:
         player.animation_mode = 12
     elif player.on_ground == False and player.y_momentum <= 0 and player.attacking and player.aim_down and player.aim_left:#left
         player.animation_mode = 13
+        
+    #attacking while jumping 
+    elif player.on_ground == False and player.attacking and player.aim_right:#right
+        player.animation_mode = 6
+    elif player.on_ground == False and player.attacking and player.aim_left:#left
+        player.animation_mode = 7
 
+   
+
+    #jumping   
+    elif player.on_ground == False and player.y_momentum <= 0 and player.aim_right:#right
+        player.animation_mode = 4
+    elif player.on_ground == False and player.y_momentum <= 0 and player.aim_left:#left
+        player.animation_mode = 5
+
+     #attacking up while standing
+    elif player.attacking and player.aim_up and player.aim_right:#right
+        player.animation_mode = 10
+    elif player.attacking and player.aim_up and player.aim_left:#left
+        player.animation_mode = 11
+    
 
     #attacking horizontally while standing
     elif player.attacking and player.aim_right:#right
@@ -1320,12 +1370,7 @@ while True:
     elif player.attacking and player.aim_left:#left
         player.animation_mode = 3 
 
-    #attacking up while standing
-    elif player.attacking and player.aim_up and player.aim_right:#right
-        player.animation_mode = 10
-    elif player.attacking and player.aim_up and player.aim_left:#left
-        player.animation_mode = 11
-    
+   
     #walking
     elif player.moving_right:#right
         player.animation_mode = 14
@@ -1346,7 +1391,6 @@ while True:
                                 # *--RENDERING--*
  #----------------------------------------------------------------------------------------------------------
 
-    player.update_rect()
 
     # void
     if player.rect.y > 2000:
@@ -1488,6 +1532,10 @@ while True:
     player.update_player_frame() #update frame played and returns the animation mode
     player_sprite = player.current_frames[player.frame_index] #determines the image/sprite which will be displayed on player pos
     canvas.blit(player_sprite, player_render_pos) 
+
+
+    # pygame.draw.rect(canvas, (255,0,0), player.attack_rect)
+    pygame.draw.rect(canvas, (255, 0, 0), (player.attack_rect.x - camera_x - x_camera_delay, player.attack_rect.y - camera_y -y_camera_delay, player.attack_rect.width, player.attack_rect.height), 2)
 
     #new player render code:
 

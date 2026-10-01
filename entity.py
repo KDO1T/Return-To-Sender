@@ -5,7 +5,7 @@ class Player:
     # *--STATS--*
     #level is the player's level, while exp is what the player gains to increase in level
     #dollars is the money the player gains throughout runs while s_coin (soul coins) is the metacurrency
-    def __init__(self, Name,rect,attack_rect,movement,moving_up,moving_down ,moving_right ,moving_left,dashing, hor_aim_list, vert_aim_list, aim_up,aim_down, aim_right, aim_left, press_space,
+    def __init__(self, Name,rect,attack_rect,movement,moving_up,moving_down ,moving_right ,moving_left,dashing,dash_dis,dash_counter, hor_aim_list, vert_aim_list, aim_up,aim_down, aim_right, aim_left, press_space,
                   y_momentum,max_air_jumps,jump,jump_height,on_ground,x_flip, all_frames ,current_frames ,frame_index, animation_mode,
                     animation_count,max_HP, damaged,base_ATK,attacking, holding_attack, attacked,attack_count,combo_stage, combo_buffer,
                     CRIT_DMG, CRIT_CHANCE, LEVEL, EXP, DOLLARS, S_COIN):
@@ -21,6 +21,8 @@ class Player:
         self.moving_right = moving_right
         self.moving_left = moving_left
         self.dashing = dashing
+        self.dash_dis = dash_dis
+        self.dash_counter = dash_counter
         self.hor_aim_list = hor_aim_list #holds what horizontal directions the player looked at
         self.vert_aim_list = vert_aim_list #holds what vertical directions the player looked at
         self.aim_up = aim_up
@@ -145,16 +147,16 @@ class Player:
             self.frame_index = (self.animation_count // 15) % len(self.current_frames)
 
         if self.animation_mode == 6: 
-            self.frame_index = (self.animation_count // 5) % len(self.current_frames)
+            self.frame_index = (self.attack_count // 5) % len(self.current_frames)
 
         if self.animation_mode == 7: 
-            self.frame_index = (self.animation_count // 5) % len(self.current_frames)
+            self.frame_index = (self.attack_count // 5) % len(self.current_frames)
 
         if self.animation_mode == 8: 
-            self.frame_index = (self.animation_count // 15) % len(self.current_frames)
+            self.frame_index = (self.attack_count // 5) % len(self.current_frames)
 
         if self.animation_mode == 9: 
-            self.frame_index = (self.animation_count // 15) % len(self.current_frames)
+            self.frame_index = (self.attack_count // 5) % len(self.current_frames)
 
         if self.animation_mode == 10: 
             self.frame_index = (self.animation_count // 15) % len(self.current_frames)
@@ -163,10 +165,10 @@ class Player:
             self.frame_index = (self.animation_count // 15) % len(self.current_frames)
 
         if self.animation_mode == 12: 
-            self.frame_index = (self.animation_count // 15) % len(self.current_frames)
+            self.frame_index = (self.attack_count // 5) % len(self.current_frames)
 
         if self.animation_mode == 13: 
-            self.frame_index = (self.animation_count // 15) % len(self.current_frames)
+            self.frame_index = (self.attack_count // 5) % len(self.current_frames)
 
         if self.animation_mode == 14: 
             self.frame_index = (self.animation_count // 10) % len(self.current_frames)
@@ -175,14 +177,22 @@ class Player:
             self.frame_index = (self.animation_count // 10) % len(self.current_frames)
 
         if self.animation_mode == 16: 
-            self.frame_index = (self.animation_count // 15) % len(self.current_frames)
+            self.frame_index = (self.animation_count // 5) % len(self.current_frames)
 
         if self.animation_mode == 17: 
-            self.frame_index = (self.animation_count // 15) % len(self.current_frames)
+            self.frame_index = (self.animation_count // 5) % len(self.current_frames)
 
 
 
     def check_cooldown(self):
+
+        #DASH
+
+        if self.dashing is True:
+            self.dash_counter += 1
+            if self.dash_counter == 12:
+                self.dashing = False
+                self.dash_counter = 0
 
         #ATTACK 
         
@@ -202,22 +212,30 @@ class Player:
             self.combo_stage = 1
             self.combo_buffer = 0
             self.hit_number = 0
+            self.aim_up = False
+            self.aim_down = False
         
         #end cycle 1
         if self.attack_count == 19:
             if not self.holding_attack:
-                self.attacking = False   
-
+                self.attacking = False 
+                self.aim_up = False
+                self.aim_down = False
+              
          #end cycle 2
         elif self.attack_count == 39:
             if not self.holding_attack:
                 self.attacking = False
+                self.aim_up = False
+                self.aim_down = False           
 
          #end cycle 3
         elif self.attack_count >= 59:
             self.attack_count = 1
             if not self.holding_attack:
                 self.attacking = False
+                self.aim_up = False
+                self.aim_down = False             
 
         
 
@@ -243,33 +261,30 @@ class Player:
 
         self.combo_stage = round(self.combo_stage, 3) 
 
-        print(self.combo_stage)
-        print(self.hit_number)
 
 
-    def update_rect(self):
-        #here
-        pass
-        
-        
+
+   
+    def update_attack_hitbox(self):
+        # Update attack_rect relative to current direction & frame
+        if self.attacking and self.attack_count in (5,25,45):
+            if self.aim_right :
+                self.attack_rect = pygame.Rect(self.rect.right-13, self.rect.y, 40, 32)
+            elif self.aim_left:
+                self.attack_rect = pygame.Rect(self.rect.left-27, self.rect.y, 40, 32)
+        else:
+            self.attack_rect = pygame.Rect(0, 0, 0, 0)
+    
 
     def attack(self,zombie_damaged, zombie_hitbox, player_damage):
-        if self.attackrect.colliderect(zombie_hitbox):
+        if self.attack_rect.colliderect(zombie_hitbox):
             print('TAKE THAT')
 
-                # if self.combo_stage < 5: #if it isn't the 5th stage, add one more stage to the combo
-                #     self.combo_stage += 1
-                # else:
-                #     self.combo_stage = 1 #if it's more than 5 than revert back to stage 1
-
-                # player_damage = self.base_ATK*(self.combo_stage/5)
-                # print(f'damaged for {player_damage}!')
-                # zombie_damaged = True
-                # self.attacked = True
-                # self.combo_tick = 0
-
-                # self.combo_window = self.max_combo_window
-            
+            player_damage = self.base_ATK*(self.combo_stage)
+            print(f'damaged for {player_damage}!')
+            zombie_damaged = True
+            self.attacked = True
+        
 
         return zombie_damaged, player_damage
 
