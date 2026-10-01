@@ -11,7 +11,7 @@ from save_system import load_game, save_game
 from settings_system import load_settings, save_settings
 from spritesheet import Spritesheet
 from tilemap import *
-from world import World_Generation
+from world import *
 
 # Safely get the brightness argument, default to 50, and keep it between 0 and 100.
 brightness = 50
@@ -147,9 +147,9 @@ player = Player(
     dash = False,
     dashing = False,
     dash_buffer = 0,
-    max_dash_buffer = 120,
-    max_dash_charges = 2,
-    dash_charges = 2,
+    max_dash_buffer = 0, #120
+    max_dash_charges = 2, #2
+    dash_charges = 100,  #2
     dash_dis = 15,
     dash_counter = 0,
     press_space = False,
@@ -161,7 +161,7 @@ player = Player(
     aim_left = False,
     y_momentum = 0,
     x_momentum = 0,
-    max_air_jumps = 2,
+    max_air_jumps = 50, #50
     jump = False,
     jump_height = 4.5,
     on_ground = None,
@@ -323,10 +323,10 @@ spawned_chunks = set()
 stage_spawned_zombies = 0
 stage_max_zombies = 30
 
-spritesheet_pool = ['grass_spritesheet.png','cartoon_spritesheet.png']
+spritesheet_pool = ['asset/grass_spritesheet.png','asset/cartoon_spritesheet.png','asset/plague_spritesheet.png','asset/exclusion_spritesheet.png']
 
 def load_stage(stage_number, saved_seed=None, saved_spritesheet=None, reset_player=True):
-    global current_stage, min_world_chunks, max_world_chunks, loaded_chunks, world, player_rect, current_spritesheet, spritesheet_pool, current_map_seed, spawned_chunks, stage_spawned_zombie
+    global current_stage, min_world_chunks, max_world_chunks, loaded_chunks, world, player_rect, current_spritesheet, spritesheet_pool, current_map_seed, spawned_chunks, stage_spawned_zombies, bg
 
     current_stage = stage_number
     loaded_chunks.clear() #resets chunks loaded
@@ -334,6 +334,8 @@ def load_stage(stage_number, saved_seed=None, saved_spritesheet=None, reset_play
     obstacles.clear()
     zombies.clear()
     stage_spawned_zombies = 0
+
+    world.last_obstacle_col = -999
 
     stage_min_chunk_x = ((stage_number-1)*stage_length) - 1
     stage_max_chunk_x = stage_min_chunk_x + stage_length
@@ -357,11 +359,57 @@ def load_stage(stage_number, saved_seed=None, saved_spritesheet=None, reset_play
         new_seed = random.randint(1,10000)
         current_spritesheet = Spritesheet(spritesheet_pool[map_index])
         spritesheet_pool.pop(map_index)
-    else:
-        new_seed = 69420
-        current_spritesheet = Spritesheet('plague_spritesheet.png')
+    elif stage_number == 3:
+        map_index = random.randrange(len(spritesheet_pool))
+        new_seed = random.randint(1,10000)
+        current_spritesheet = Spritesheet(spritesheet_pool[map_index])
+        spritesheet_pool.pop(map_index)
+    elif stage_number == 4:
+        map_index = random.randrange(len(spritesheet_pool))
+        new_seed = random.randint(1,10000)
+        current_spritesheet = Spritesheet(spritesheet_pool[map_index])
+        spritesheet_pool.pop(map_index)
 
     current_map_seed = new_seed
+
+    #*--------------------------------------------------------------PARALLAX----------------------------------------------------------------------*
+    if current_spritesheet is not None:
+        active_spritesheet = current_spritesheet.spritesheet
+    bg = ParallaxBackground(base_res_x, base_res_y)
+
+    if active_spritesheet == 'asset/cartoon_spritesheet.png':
+        #ABANDONED CITY (CARTOON SPRITESHEET)
+
+        bg.add_layer('asset/abandoned_city/abandoned_sky.png', scroll_factor=0.0)
+        bg.add_layer('asset/abandoned_city/abandoned_building1.png', scroll_factor=0.2)
+        bg.add_layer('asset/abandoned_city/abandoned_building2.png',scroll_factor=0.2)
+        bg.add_layer('asset/abandoned_city/abandoned_building3.png',scroll_factor=0.2)
+
+    elif active_spritesheet == 'asset/grass_spritesheet.png':
+        #APOCALYPTIC CITY (GRASS SPRITESHEET)
+
+        bg.add_layer('asset/apocalyptic_city/apocalyptic_sky.png', scroll_factor=0.0)
+        bg.add_layer('asset/apocalyptic_city/apocalyptic_building1.png', scroll_factor=0.2)
+        bg.add_layer('asset/apocalyptic_city/apocalyptic_building2.png',scroll_factor=0.2)
+        bg.add_layer('asset/apocalyptic_city/apocalyptic_building3.png',scroll_factor=0.2)
+
+    elif active_spritesheet == 'asset/plague_spritesheet.png':
+        #GHOST TOWN (PLAGUE SPRITESHEET)
+
+        bg.add_layer('asset/ghost_town/ghost_sky.png', scroll_factor=0.0)
+        bg.add_layer('asset/ghost_town/ghost_town_folliage.png', scroll_factor=0.2)
+        bg.add_layer('asset/ghost_town/ghost_town1.png',scroll_factor=0.267)
+        bg.add_layer('asset/ghost_town/ghost_town2.png',scroll_factor=0.267)
+        bg.add_layer('asset/ghost_town/ghost_town_trees.png',scroll_factor=0.367)
+        
+    elif active_spritesheet == 'asset/exclusion_spritesheet.png':
+
+        bg.add_layer('asset/industrial/industrial_bg.png', scroll_factor=0.0)
+        bg.add_layer('asset/industrial/industrial_far_buildings.png', scroll_factor=0.2)
+        bg.add_layer('asset/industrial/industrial_building.png',scroll_factor=0.2)
+        bg.add_layer('asset/industrial/industrial_foreground.png',scroll_factor=0.2)
+        
+
 
     print(
     "GENERATING WORLD:",
@@ -459,7 +507,6 @@ else:
     load_stage(current_stage)
 
 while True: 
-
 
 
     player.jump = False #resets jump
@@ -877,7 +924,8 @@ while True:
                 tile_grid = world.generate_chunk_data(chunk_x,chunk_y)
                 loaded_chunks[chunk_key] = TileMap(tile_grid,current_spritesheet, tile_size)
 
-                new_obstacles = world.generate_chunk_obstacles(chunk_x, chunk_y, tile_grid)
+                new_obstacles, world.last_obstacle_col = world.generate_chunk_obstacles(chunk_x, chunk_y, tile_grid, world.last_obstacle_col)
+
                 obstacles.extend(new_obstacles)
 
     for chunk_key in list(loaded_chunks.keys()):
@@ -1531,7 +1579,11 @@ while True:
             if y_camera_delay >= 0:
                 y_camera_delay = 0
 
+    
+    effective_camera_x = camera_x + x_camera_delay
+    effective_camera_y = camera_y + y_camera_delay
 
+    bg.draw(canvas, effective_camera_x, effective_camera_y)
 
 
     for (chunk_x,chunk_y), tile_map in loaded_chunks.items():

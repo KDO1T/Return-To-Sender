@@ -1,4 +1,5 @@
 import random
+import pygame
 from tilemap import Obstacle
 from spritesheet import Spritesheet
 
@@ -11,7 +12,8 @@ class World_Generation:
         self.chunk_pixel_h = chunk_tiles_y * tile_size
         self.noise1d = noise1d
         self.noise2d = noise2d
-        self.obstacle_spritesheet  = Spritesheet('obstacle_spritesheet.png')  #change this.
+        self.last_obstacle_col = -999
+        self.obstacle_spritesheet  = Spritesheet('asset/obstacle_spritesheet.png')  #change this.
         self.obstacle_types = []
         for sprite_name, frame_data in self.obstacle_spritesheet.data['frames'].items():
             is_solid = not sprite_name.startswith('bush')   #checks if sprite is a solid state
@@ -106,57 +108,108 @@ class World_Generation:
                                     grid[y][x] = '1'
         return grid
 
-    def generate_chunk_obstacles(self, chunk_x, chunk_y, tile_grid):
+    def generate_chunk_obstacles(self, chunk_x, chunk_y, tile_grid, last_global_col):
         chunk_obstacles = []
         chunk_world_min_x = chunk_x * self.chunk_pixel_w
 
         num_rows = len(tile_grid)
-        if num_rows >0:
-            num_columns = len(tile_grid[0])
-        else:
-            num_columns = 0
+        if num_rows == 0:
+            return chunk_obstacles, last_global_col
+        num_columns = len(tile_grid[0])
 
-        min_obstacle_spacing = 3
-        last_spawned_column = -min_obstacle_spacing
-
+        min_obstacle_spacing = 5
+        chunk_start_col = chunk_x * num_columns
 
         for column in range(num_columns):
-
-            if column - last_spawned_column < min_obstacle_spacing:
-                continue
+            global_col = chunk_start_col + column
             
+            if global_col - last_global_col < min_obstacle_spacing:
+                continue
+
+            surface_row = None
             for row in range(num_rows):
                 tile_id = tile_grid[row][column]
-
                 if tile_id != '-1' and row >0 and tile_grid[row-1][column] == '-1':
 
-                    #Flat ground check
-                    is_flat = False
-                    if column + 1 < num_columns:
-                        adjacent_ground = tile_grid[row][column + 1] != '-1'
-                        adjacent_air = tile_grid[row-1][column+1] == '-1'
-                        if adjacent_air and adjacent_ground:
-                            is_flat = True
+                    is_above_surface = True
+                    for row_above in range(0, row):
+                        if tile_grid[row_above][column] != '-1':
+                            is_above_surface = False
+                            break
 
-                    if is_flat and random.random() < 0.15:    #15% of spawning an obstacle
-                        obstacle_info = random.choice(self.obstacle_types)
+                    if is_above_surface:
+                        surface_row = row
+                        break
+                    
 
-                        #obstacle spawn coords
-                        obstacle_x = chunk_world_min_x + (column*self.tile_size)
-                        obstacle_y = chunk_y*self.chunk_pixel_h + random.randint(0,64)
+            if surface_row is not None:
+                if random.random() < 0.15:
+                    obstacle_info = random.choice(self.obstacle_types)
 
-                        obstacle = Obstacle(
-                            sprite_name= obstacle_info['sprite'],
-                            x= obstacle_x,
-                            y= obstacle_y,
-                            spritesheet= self.obstacle_spritesheet,
-                            solid=obstacle_info['solid'],
-                            width = obstacle_info.get('w',32),
-                            height = obstacle_info.get('h',32)
-                        )
-                        chunk_obstacles.append(obstacle)
-                        last_spawned_column = column
-                    break #stop finding once object is placed
+                    obstacle_w = obstacle_info.get('w',32)  #calculates the width of one obstacle
+                    tiles_needed = (obstacle_w// self.tile_size) + 1
 
-        return chunk_obstacles
+                    if column + tiles_needed <= num_columns:
+                        #Flat ground check
+                        is_flat = True
 
+                        for column_offset in range(tiles_needed):
+                            check_col = column + column_offset
+
+                            adjacent_ground = tile_grid[surface_row][check_col] != '-1'
+                            adjacent_air = tile_grid[surface_row-1][check_col] == '-1'
+                            if not (adjacent_air and adjacent_ground):
+                                is_flat = False
+                                break
+
+                        if is_flat:    #15% of spawning an obstacle
+                            #obstacle spawn coords
+                            obstacle_x = chunk_world_min_x + (column*self.tile_size)
+                            obstacle_y = chunk_y*self.chunk_pixel_h + random.randint(0,64)
+
+                            obstacle = Obstacle(
+                                sprite_name= obstacle_info['sprite'],
+                                x= obstacle_x,
+                                y= obstacle_y,
+                                spritesheet= self.obstacle_spritesheet,
+                                solid=obstacle_info['solid'],
+                                width = obstacle_w,
+                                height = obstacle_info.get('h',32)
+                            )
+                            chunk_obstacles.append(obstacle)
+                            last_global_col = global_col + tiles_needed + min_obstacle_spacing
+
+        return chunk_obstacles, last_global_col
+
+class ParallaxBackground:
+    def __init__(self, screen_width, screen_height):
+        self.screen_width = screen_width
+        self.screen_height = screen_height
+        self.layers = []
+
+    def add_layer(self, image_path, scroll_factor):
+        image = pygame.image.load(image_path).convert_alpha() #removes alpha channel from image
+        image = pygame.transform.scale(image, (self.screen_width,self.screen_height))
+        self.layers.append({
+            'surface': image,
+            'factor': scroll_factor,
+            'width': image.get_width()
+        })
+
+    def draw(self,surface,camera_x,camera_y=0):
+        for layer in self.layers:
+            img = layer['surface']
+            factor = layer['factor']
+            width = layer['width']
+
+            x_offset = (camera_x *factor)%width
+
+            draw_x = -x_offset
+
+            surface.blit(img, (draw_x,0))
+            if draw_x < 0:
+                surface.blit(img,(draw_x + width,0))
+            elif draw_x > 0:
+                surface.blit(img, (draw_x - width,0))
+
+        
