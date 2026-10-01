@@ -55,6 +55,20 @@ class Player:
         self.DOLLARS = DOLLARS
         self.S_COIN = S_COIN
 
+        # *--SKILL TREE--*
+        # Filled in by skill_tree.apply_skill_effects(). The defaults below mean "no upgrades".
+        self.skill_tree_purchased = []      #ids of purchased skills (saved per save slot)
+        self.ranged_unlocked = False        #becomes True when the final boss is defeated
+        self.base_combo_cooldown = combo_cooldown
+        self.base_move_speed = 4
+        self.move_speed = 4                 #pixels per frame, used by main.py
+        self.damage_mult = 1.0
+        self.crit_chance_bonus = 0.0
+        self.crit_dmg_bonus = 0.0
+        self.damage_reduction = 0.0
+        self.knockback_resist = 0.0         #no player knockback exists yet, ready for when it does
+        self.bonus_max_HP = 0               #max HP that comes from the skill tree (not saved as base)
+
     def update_action (self):
 
         if self.animation_mode == 0: #idle
@@ -152,7 +166,15 @@ class Player:
                 else:
                     self.combo_stage = 1 #if it's more than 5 than revert back to stage 1
 
-                player_damage = self.base_ATK*(self.combo_stage/5)
+                player_damage = (self.base_ATK or 0) * self.damage_mult * (self.combo_stage/5)
+
+                #critical hit roll (base 5% chance / x1.5 damage, plus skill tree bonuses)
+                crit_chance = (self.CRIT_CHANCE if self.CRIT_CHANCE is not None else 0.05) + self.crit_chance_bonus
+                crit_damage = (self.CRIT_DMG if self.CRIT_DMG is not None else 1.5) + self.crit_dmg_bonus
+                if random.random() < crit_chance:
+                    player_damage *= crit_damage
+                    print('CRITICAL HIT!')
+
                 print(f'damaged for {player_damage}!')
                 zombie_damaged = True
                 self.attacked = True
@@ -166,6 +188,7 @@ class Player:
 
     def receive_damage(self, zombie_damage):
         if self.damaged is True:
+            zombie_damage = max(1, round(zombie_damage * (1 - self.damage_reduction)))  #skill tree: damage reduction
             self.HP -= zombie_damage
             self.damaged = False
             if self.HP > 0:

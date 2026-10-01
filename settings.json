@@ -1,6 +1,6 @@
 {
     "resolution_index": 1,
-    "fullscreen": false,
+    "fullscreen": true,
     "brightness": 50,
     "master_volume": 100,
     "music_volume": 80,
