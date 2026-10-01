@@ -331,7 +331,7 @@ class Player:
             self.attack_rect = pygame.Rect(0, 0, 0, 0)
         
 
-    def attack(self,zombie_damaged, zombie_hitbox, player_damage):
+    def attack(self,zombie_damaged, zombie_hitbox, player_damage, freeze_frame_counter):
         if self.attack_rect.colliderect(zombie_hitbox) and self.attacked is True:
             print('TAKE THAT')
 
@@ -341,9 +341,15 @@ class Player:
             zombie_damaged = True
             self.attacked = False
             self.hit_landed = True
+
+            if player_damage > self.base_ATK*2: #if damage gets to double what the player is capable of, freeze frame increases
+                freeze_frame_counter = 6       
+            else:
+                freeze_frame_counter = 4
+
             
 
-        return zombie_damaged, player_damage
+        return zombie_damaged, player_damage, freeze_frame_counter
 
 
     def calculate_screen_shake(self, player_damage, horizontal_cam_shake, vertical_cam_shake):
