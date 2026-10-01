@@ -1,0 +1,27 @@
+{
+    "slot_index": 0,
+    "name": "Save 1",
+    "brightness": 50,
+    "player": {
+        "Name": null,
+        "HP": -616,
+        "max_HP": 50,
+        "base_ATK": 5,
+        "CRIT_DMG": null,
+        "CRIT_CHANCE": null,
+        "LEVEL": null,
+        "EXP": null,
+        "DOLLARS": null,
+        "S_COIN": null
+    },
+    "position": {
+        "x": 6552,
+        "y": 224
+    },
+    "world": {
+        "current_stage": 2,
+        "map_seed": 3371,
+        "spritesheet": "cartoon_spritesheet.png",
+        "zombie_count": 18
+    }
+}
