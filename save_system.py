@@ -12,9 +12,8 @@ os.makedirs(SAVES_DIR, exist_ok=True)
 KEYRING_SERVICE = "Return To Sender"
 KEYRING_USERNAME = "save_encryption_key"
 
-# Set to True when you want save files encrypted.
-# Set to False while testing so you can open the JSON and inspect the saved data.
-USE_ENCRYPTION = True
+
+USE_ENCRYPTION = False
 
 # Values used when a save file does not contain a stat yet (brand new saves / old saves).
 DEFAULT_CRIT_DMG = 1.5
