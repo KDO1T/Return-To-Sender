@@ -9,6 +9,7 @@ from pygame.locals import *
 from entity import Player, Zombie, zombies
 from save_system import load_game, save_game
 from settings_system import load_settings, save_settings
+from skill_tree import SkillTreeState, SkillTreeUI, apply_skill_effects
 from spritesheet import Spritesheet
 from tilemap import *
 from world import World_Generation
@@ -100,7 +101,7 @@ brightness_surface = create_brightness_surface(brightness)
 
 clock = pygame.time.Clock() #assigning the clock function to a variable to use for the fps in the gameloop
 
-# pause menu fonts
+
 font_pause_title = pygame.font.Font("fonts/Press_Start_2P/PressStart2P.ttf", 24)
 font_pause = pygame.font.Font("fonts/VT323/VT323.ttf", 34)
 font_pause_small = pygame.font.Font("fonts/VT323/VT323.ttf", 26)
@@ -401,10 +402,43 @@ pause_options_state = "MAIN"
 pause_dragging_slider = None
 pause_dropdown_open = False
 pause_rebinding_control = None
+skills_opened_with_hotkey = False   # Sets itself to true when the skill tree is opened with K instead of the pause menu, to avoid error
 
+# Turn this off (or delete the F6 block in the event loop) once Soul Coins are earned in-game.
+DEBUG_SOUL_COINS = True
 
 brightness, saved_world = load_game(save_slot, player, player_rect, brightness)
 brightness_surface = create_brightness_surface(brightness)
+
+# Skill tree: purchased skills + ranged unlock live on the player, so they come from THIS save slot.
+skill_tree = SkillTreeState(player)
+apply_skill_effects(player, skill_tree, heal_on_gain=False)
+skill_ui = SkillTreeUI(skill_tree, base_res_x, base_res_y)
+
+def pause_button_rects():
+    return [pygame.Rect(220, 100 + index * 42, 200, 38) for index in range(5)]
+
+
+def close_skill_tree():
+    global pause_state, paused
+    pause_state = "PAUSE"
+    if skills_opened_with_hotkey:
+        paused = False
+
+# Restore the saved world state before generating the current stage.
+saved_stage = saved_world.get("current_stage")
+saved_seed = saved_world.get("map_seed")
+
+print(
+    "LOADED WORLD:",
+    "stage =", current_stage,
+    "seed =", saved_seed,
+    "player =", (player.rect.x, player.rect.y)
+)
+saved_spritesheet = saved_world.get("spritesheet")
+saved_zombie_count = saved_world.get("zombie_count")
+if isinstance(saved_zombie_count, int) and saved_zombie_count >= 0:
+    zombie_count = saved_zombie_count
 
 
 saved_stage = saved_world.get("current_stage")
@@ -504,7 +538,9 @@ while True:
 
         # ESC opens/closes the pause menu.
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            if pause_state == "OPTIONS":
+            if paused and pause_state == "SKILLS":
+                close_skill_tree()
+            elif pause_state == "OPTIONS":
                 if pause_options_state != "MAIN":
                     pause_options_state = "MAIN"
                 else:
@@ -516,6 +552,22 @@ while True:
         if event.type == pygame.KEYDOWN and event.key == pygame.K_F5:
             update_settings_file()
             save_current_game()
+
+        # K opens the skill tree straight from gameplay.
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_k and not paused:
+            paused = True
+            pause_state = "SKILLS"
+            skills_opened_with_hotkey = True
+            # key-release events are ignored while paused, so let go of held movement keys now
+            player.moving_left = player.moving_right = False
+            player.aim_left = player.aim_right = player.aim_up = player.aim_down = False
+            player.attacking = False
+            skill_ui.open()
+            continue
+
+        # DEBUG: F6 gives +10 Soul Coins so the skill tree can be tested.
+        if DEBUG_SOUL_COINS and event.type == pygame.KEYDOWN and event.key == pygame.K_F6:
+            player.S_COIN = (player.S_COIN or 0) + 10
         # elif player_rect.right>total_map_w or player_rect.top <0 or player_rect.bottom> total_map_h:
         #     pygame.quit()
         #     sys.exit()
@@ -527,24 +579,34 @@ while True:
             mouse_x = event.pos[0] * base_res_x / screen_state_w if hasattr(event, "pos") else 0
             mouse_y = event.pos[1] * base_res_y / screen_state_h if hasattr(event, "pos") else 0
 
+            # Skill tree screen: all input goes to the skill tree UI.
+            if pause_state == "SKILLS":
+                skill_result = skill_ui.handle_event(event, (mouse_x, mouse_y))
+                if skill_result == "purchased":
+                    apply_skill_effects(player, skill_tree, heal_on_gain=True)
+                    update_settings_file()
+                    save_current_game()        # auto-save so the purchase is stored in this slot
+                elif skill_result == "close":
+                    close_skill_tree()
+                continue
+
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if pause_state == "PAUSE":
-                    pause_buttons = [
-                        pygame.Rect(220, 105, 200, 38),
-                        pygame.Rect(220, 150, 200, 38),
-                        pygame.Rect(220, 195, 200, 38),
-                        pygame.Rect(220, 240, 200, 38)
-                    ]
+                    pause_buttons = pause_button_rects()
 
                     if pause_buttons[0].collidepoint(mouse_x, mouse_y):
                         paused = False
                     elif pause_buttons[1].collidepoint(mouse_x, mouse_y):
+                        pause_state = "SKILLS"
+                        skills_opened_with_hotkey = False
+                        skill_ui.open()
+                    elif pause_buttons[2].collidepoint(mouse_x, mouse_y):
                         pause_state = "OPTIONS"
                         pause_options_state = "MAIN"
-                    elif pause_buttons[2].collidepoint(mouse_x, mouse_y):
+                    elif pause_buttons[3].collidepoint(mouse_x, mouse_y):
                         update_settings_file()
                         save_current_game()
-                    elif pause_buttons[3].collidepoint(mouse_x, mouse_y):
+                    elif pause_buttons[4].collidepoint(mouse_x, mouse_y):
                         update_settings_file()
                         save_current_game()
                         pygame.quit()
@@ -777,14 +839,17 @@ while True:
 
         if pause_state == "PAUSE":
             pause_title = font_pause_title.render("PAUSED", False, (240, 240, 240))
-            display_canvas.blit(pause_title, pause_title.get_rect(center=(base_res_x / 2, 55)))
+            display_canvas.blit(pause_title, pause_title.get_rect(center=(base_res_x / 2, 50)))
 
-            pause_buttons = ["Resume", "Options", "Save", "Quit"]
+            pause_buttons = ["Resume", "Skill Tree", "Options", "Save", "Quit"]
             for index, option in enumerate(pause_buttons):
-                button_rect = pygame.Rect(220, 105 + index * 45, 200, 38)
+                button_rect = pause_button_rects()[index]
                 selected_color = (235, 65, 40) if button_rect.collidepoint(mouse_x, mouse_y) else (240, 240, 240)
                 option_text = font_pause.render(option, False, selected_color)
                 display_canvas.blit(option_text, option_text.get_rect(center=button_rect.center))
+
+        elif pause_state == "SKILLS":
+            skill_ui.draw(display_canvas, (mouse_x, mouse_y))
 
         elif pause_state == "OPTIONS":
             options_panel = pygame.Surface((520, 285), pygame.SRCALPHA)

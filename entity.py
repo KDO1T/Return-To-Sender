@@ -73,6 +73,19 @@ class Player:
         self.DOLLARS = DOLLARS
         self.S_COIN = S_COIN
 
+        # *--SKILL TREE--*
+        # Filled in by skill_tree.apply_skill_effects(). The defaults below mean "no upgrades".
+        self.skill_tree_purchased = []      #ids of purchased skills (saved per save slot)
+        self.ranged_unlocked = False        #becomes True when the final boss is defeated
+        self.base_move_speed = 4
+        self.move_speed = 4                 #pixels per frame, used by main.py
+        self.damage_mult = 1.0
+        self.crit_chance_bonus = 0.0
+        self.crit_dmg_bonus = 0.0
+        self.damage_reduction = 0.0
+        self.knockback_resist = 0.0         #no player knockback exists yet, ready for when it does
+        self.bonus_max_HP = 0               #max HP that comes from the skill tree (not saved as base)
+
     def update_action (self):
         
         if self.animation_mode == 0: 
@@ -308,6 +321,7 @@ class Player:
                 else:
                     self.attack_rect = pygame.Rect(self.rect.x - 23, self.rect.top -10, 50, 40)
 
+
             elif self.aim_down and not self.on_ground :
                 if face_right is True:
                     self.critical_rect = pygame.Rect(self.rect.x +3 , self.rect.bottom + 5, 20,15)
@@ -339,13 +353,28 @@ class Player:
             if self.attack_rect.colliderect(zombie.rect):
                 if zombie not in self.zombies_hit: #if the zombies arent in the most recently hit then function normally or else ignore to prevent double damaging
 
+                    #Damage Calculation:
+
+                    #Combo multiplier
                     self.combo_stage*= self.combo_multipliers[self.hit_number%3] #cycles through the multipliers as the attack goes on
                     self.combo_stage = round(self.combo_stage, 3) 
-                    player_damage = self.base_ATK*(self.combo_stage)
 
+                    #External multiplier
+                    player_damage =(self.base_ATK or 0) * self.damage_mult **(self.combo_stage)
+
+                    #Crit multiplier
+                    crit_chance = (self.CRIT_CHANCE if self.CRIT_CHANCE is not None else 0.05) + self.crit_chance_bonus
+                    crit_damage = (self.CRIT_DMG if self.CRIT_DMG is not None else 1.5) + self.crit_dmg_bonus
+                    if random.random() < crit_chance:
+                        player_damage *= crit_damage
 
                     zombie.damaged = True
                     zombie.receive_damage(player_damage)
+     
+            
+                    print(f'damaged for {player_damage}!')
+                   
+
                     zombie.calculate_knockback(self.aim_up,self.aim_down, self.x_flip, self.rect, self.on_ground, self.mom_force, self.attack_count)
                     self.zombies_hit.append(zombie)
                     freeze_frame_counter = 3
@@ -375,6 +404,7 @@ class Player:
         #         self.y_momentum = -3
         #     else:
         #         freeze_frame_counter = 3
+
 
             
 
@@ -407,7 +437,9 @@ class Player:
 
     def receive_damage(self, zombie_damage, freeze_frames):
         if self.damaged is True:
+
             if self.invulnerable == False: 
+                zombie_damage = max(1, round(zombie_damage * (1 - self.damage_reduction)))
                 self.HP -= zombie_damage
                 self.damaged = False
                 freeze_frames = 2  
@@ -419,6 +451,7 @@ class Player:
 
 
                 
+
             else:
                 print('im invulnerable')
                 self.damaged = False
