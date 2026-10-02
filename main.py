@@ -140,8 +140,8 @@ screen_shake_y=0
 player = Player(
     Name=None,
     rect = pygame.Rect(100, 200, 32, 32),
-    attack_rect = pygame.Rect(0, 0, 0, 0),
-    critical_rect = pygame.Rect(0,0,0,0),
+    attack_rect = None,
+    critical_rect = None,
     movement=[0,0],
     moving_up = False,
     moving_down = False,
@@ -184,10 +184,10 @@ player = Player(
     attacking = False,
     holding_attack = False,
     hit_landed = False,
-    attacked = False,
     attack_count = 0,
     combo_stage = 1,
     combo_buffer= 0,
+    zombies_hit = [],
     CRIT_DMG=None, 
     CRIT_CHANCE=None, 
     LEVEL=None, 
@@ -206,8 +206,14 @@ player.vert_aim_list.append('up')
 
 #ZOMBIES
 choice_count = 0 #stores the amount of frames it has been to make a new choice
-zombie_sprite = pygame.image.load('animations/base_zombie.png')
 
+zombie_sheet = Spritesheet('animations/spritesheets/zombie_sheet.png')
+
+all_zombie_frames = []
+
+for i in range(23):
+    filename = f'base_zombie {i}.aseprite'
+    all_zombie_frames.append(zombie_sheet.parse_sprite(filename))
 
 
 # *------------------------------ANIMATION------------------------------------------------------------------------
@@ -932,9 +938,9 @@ while True:
                 spawn_y = 100
 
                 new_zombie = Zombie(
-                    pygame.Rect(spawn_x, spawn_y, 32 ,32), None,
+                    pygame.Rect(spawn_x, spawn_y, 32 ,32), [],0,0,0,None,
                     [0,0], 0 , 0 , 0, False, (0,0), False, 
-                    'Still', False, random.randint(1,3), 0,
+                    'Still', False, random.randint(1,3),0,0, False,
                     False, False, False, 0, 45, int(current_stage*5 + 15), 
                     int(current_stage*2 + 5)
                 )
@@ -942,8 +948,6 @@ while True:
                 zombies.append(new_zombie)
             stage_spawned_zombies += 1
     zombie_count = len(zombies)
-
-
 
 
     # *---------------------------------------------------------------------------
@@ -997,6 +1001,9 @@ while True:
     
     # *---------------------------------------------------------------------------
     #                                       FREEZE FRAME
+
+    if hit_freeze_timer == None:
+        hit_freeze_timer = 0
 
     if hit_freeze_timer > 0:
         hit_freeze_timer -= 1
@@ -1149,19 +1156,17 @@ while True:
         player_damage = 0
         total_damage = 0
         player.check_cooldown()
+        player.update_attack_hitbox()
+        applied_damage = player.attack(zombies, hit_freeze_timer) 
+
         for zombie in zombies:
-            player.update_attack_hitbox()
-            zombie.damaged, applied_damage, hit_freeze_timer = player.attack(zombie.damaged, zombie.rect, zombie.head_rect,player_damage, hit_freeze_timer)
-            total_damage += applied_damage
-            zombie.receive_damage(applied_damage)
-            zombie.calculate_knockback(player.aim_up,player.aim_down, player.x_flip, player.rect, player.on_ground, player.mom_force, player.attack_count)
-            zombie.check_staggered()
+            zombie.check_staggered()    
             del_zomb = zombie.dead_check(zomb_no)
             if del_zomb is not None:
                 zombies.pop(del_zomb)
             zomb_no += 1
 
-        screen_shake_x, screen_shake_y = player.calculate_screen_shake(total_damage, screen_shake_x, screen_shake_y)
+        screen_shake_x, screen_shake_y = player.calculate_screen_shake(applied_damage, screen_shake_x, screen_shake_y)
         
             
 
@@ -1169,9 +1174,10 @@ while True:
         #ZOMBIES ATTACKING PLAYER
         for zombie in zombies:
             zombie.touch_player(player.rect)
+            zombie.check_cooldown()
             if zombie.staggered == False:
                 player.damaged = zombie.attack_player(player.HP)
-            player.receive_damage(zombie.ATK)
+            hit_freeze_timer = player.receive_damage(zombie.ATK, hit_freeze_timer)
             player.dead_check()
 
         
@@ -1211,10 +1217,12 @@ while True:
 
         
         for zombie in zombies: 
-            if zombie.render_pos[0] < position_chunk_x or zombie.render_pos[0] > position_chunk_x:#freezes movement horizontal movement if zombie isn't in frame
-                zombie.idle_move = 'Still'
-            
 
+            zombie_chunk_x = zombie.rect.centerx // chunk_pixel_w # <-- what chunk the zombie is in 
+            if abs(zombie_chunk_x - position_chunk_x) >= render_distance: #<-- if zombie is out of bounds, make them stand still
+                zombie.idle_move = 'Still'
+        
+        
             zombie.movement = [0,0]
 
             if abs(zombie.x_push_momentum) > 0:#if there is any X_knockback applied to zombie then apply it
@@ -1333,8 +1341,8 @@ while True:
 
                                     # *--ANIMATION--*
     #-----------------------------------------------------------------------------------------------------
-        #chooses what type of action the player is doing to then determine animation playing
-
+        
+        #PLAYER ANIMATIONS
 
         #dashing
         if player.dashing == True and player.aim_right: 
@@ -1423,6 +1431,31 @@ while True:
 
         else: 
             player.animation_mode = 0
+
+
+        #ZOMBIE ANIMATIONS
+        #walking
+        for zombie in zombies:
+
+            if zombie.attack_count > 0 and zombie.touched_player: 
+                if zombie.x_flip == False: #attack right
+                    zombie.animation_mode = 5
+                elif zombie.x_flip == True: #attack left
+                    zombie.animation_mode = 6
+
+            elif zombie.chase_player == False:
+                if zombie.movement[0] > 0 :# walk right
+                    zombie.animation_mode = 1
+                elif zombie.movement[0] < 0:#walk left
+                    zombie.animation_mode = 2
+            elif zombie.chase_player == True:
+                if zombie.movement[0] > 0 :# chase right
+                    zombie.animation_mode = 3
+                elif zombie.movement[0] < 0:# chase left
+                    zombie.animation_mode = 4
+            else:
+                zombie.animation_mode = 0
+
 
 
 
@@ -1553,7 +1586,8 @@ while True:
         zombie.render_pos = ((zombie.rect.x - camera_x) - x_camera_delay - screen_shake_x, (zombie.rect.y - camera_y) - y_camera_delay - screen_shake_y) 
     #                                                                                                   ^negative camera delay
         #disables zombie gravity if out of range
-        if zombie.render_pos[0] < position_chunk_x:
+        zombie_chunk_x = zombie.rect.centerx // chunk_pixel_w # <-- what chunk the zombie is in 
+        if abs(zombie_chunk_x - position_chunk_x) >= render_distance: #<-- if the zombie is out of bounds, gravity is disabled
             zombie.y_momentum = 0
 
     #flipping code
@@ -1588,9 +1622,11 @@ while True:
         pygame.draw.rect(canvas, (0,255, 255), (zombie.rect.x - camera_x - x_camera_delay, zombie.rect.y - camera_y -y_camera_delay, zombie.rect.width, zombie.rect.height))
     for zombie in zombies:
         pygame.draw.rect(canvas, (0,0, 255), (zombie.head_rect.x - camera_x - x_camera_delay, zombie.head_rect.y - camera_y -y_camera_delay, zombie.head_rect.width, zombie.head_rect.height))
-    pygame.draw.rect(canvas, (255, 0, 0), (player.attack_rect.x - camera_x - x_camera_delay, player.attack_rect.y - camera_y -y_camera_delay, player.attack_rect.width, player.attack_rect.height), 2)
-    pygame.draw.rect(canvas, (0, 255, 0), (player.critical_rect.x - camera_x - x_camera_delay, player.critical_rect.y - camera_y -y_camera_delay, player.critical_rect.width, player.critical_rect.height), 2)
     
+    if player.attack_rect is not None and player.critical_rect is not None:
+        pygame.draw.rect(canvas, (255, 0, 0), (player.attack_rect.x - camera_x - x_camera_delay, player.attack_rect.y - camera_y -y_camera_delay, player.attack_rect.width, player.attack_rect.height), 2)
+        pygame.draw.rect(canvas, (0, 255, 0), (player.critical_rect.x - camera_x - x_camera_delay, player.critical_rect.y - camera_y -y_camera_delay, player.critical_rect.width, player.critical_rect.height), 2)
+        
     #new player render code:
     # above this will be the code determining the sprite and rect
     # canvas.blit(player_sprite, player_render_pos)
@@ -1598,7 +1634,15 @@ while True:
 
 
     for zombie in zombies:
-        canvas.blit(pygame.transform.flip(zombie_sprite, zombie.x_flip, False), (zombie.render_pos))
+        zombie_chunk_x = zombie.rect.centerx // chunk_pixel_w # <-- what chunk the zombie is in 
+        if abs(zombie_chunk_x - position_chunk_x) <= render_distance: #<-- if the chunk distance between the zombie and player is less than the player render distance
+            zombie.current_frames = zombie.update_action(all_zombie_frames) #determines the current type of animation playing only if the animation mode changes
+            zombie.update_zombie_frame() #update frame played and returns the animation mode
+            zombie_sprite = zombie.current_frames[zombie.frame_index] #determines the image/sprite which will be displayed on player pos
+            if zombie.animation_mode != 0:
+                canvas.blit(zombie_sprite, zombie.render_pos) 
+            else:
+                canvas.blit(pygame.transform.flip(zombie_sprite, zombie.x_flip, False), (zombie.render_pos))
     
 
      

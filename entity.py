@@ -7,9 +7,9 @@ class Player:
     #dollars is the money the player gains throughout runs while s_coin (soul coins) is the metacurrency
     def __init__(self, Name,rect,attack_rect,critical_rect, movement,moving_up,moving_down ,moving_right ,moving_left,dash, dashing,dash_dis,dash_counter, 
                  hor_aim_list, holding_up, holding_down, vert_aim_list, aim_up,aim_down, dash_charges,max_dash_buffer,dash_buffer, 
-                 max_dash_charges, aim_right, aim_left, press_space,
-                  y_momentum,x_momentum, max_air_jumps,jump,jump_height,on_ground,x_flip, all_frames ,current_frames ,frame_index, animation_mode,
-                    animation_count,max_HP,i_counter,invulnerable, damaged,base_ATK,attacking, holding_attack, attacked,attack_count,combo_stage, hit_landed, combo_buffer,
+                 max_dash_charges, aim_right, aim_left, press_space,y_momentum,x_momentum, max_air_jumps,jump,jump_height,on_ground,x_flip,
+                   all_frames ,current_frames ,frame_index, animation_mode,animation_count,max_HP,i_counter,invulnerable, damaged,base_ATK,attacking,
+                     holding_attack,attack_count,combo_stage, hit_landed, combo_buffer, zombies_hit,
                     CRIT_DMG, CRIT_CHANCE, LEVEL, EXP, DOLLARS, S_COIN):
         self.Name = Name
         self.rect = rect
@@ -59,12 +59,12 @@ class Player:
         self.mom_force = 10 #the momentum the player applies to zombies when knocking them back
         self.attacking = attacking
         self.holding_attack = holding_attack
-        self.attacked = attacked
         self.attack_count = attack_count
         self.combo_stage = 1
         self.combo_multipliers = [1.0025,1.002,1.003]
         self.hit_landed = hit_landed 
         self.hit_number = 0
+        self.zombies_hit = []
         self.combo_buffer = combo_buffer #time between each slash of the combo
         self.CRIT_DMG = CRIT_DMG
         self.CRIT_CHANCE = CRIT_CHANCE
@@ -211,9 +211,9 @@ class Player:
 
         #iframes
         if self.dashing is True:
-            self.invulnerable == True
+            self.invulnerable = True
         else:
-            self.invulnerable == False
+            self.invulnerable = False
 
         #DASH
 
@@ -269,34 +269,39 @@ class Player:
             if not self.holding_attack:
                 self.attacking = False
                         
-
-        
-
-
-        #slash 1
-        if self.attack_count == 5:
-            self.attacked = True
+        # #slash 1
+        # if self.attack_count == 5:
+        #     self.attacked = True
         
             
-        #slash 2
-        elif self.attack_count == 25:
-            self.attacked = True
+        # #slash 2
+        # elif self.attack_count == 25:
+        #     self.attacked = True
     
 
-        #slash 3
-        elif self.attack_count == 45:
-            self.attacked = True
+        # #slash 3
+        # elif self.attack_count == 45:
+        #     self.attacked = True
 
+        # ^^ use the hitbox as a better way of timing the attacks instead of using self.attacked
 
 
 
    
     def update_attack_hitbox(self):
+
+        #booleans if for when each swings are playing
+        swing_1_active_window = 5 <= self.attack_count <= 10  
+        swing_2_active_window = 25 <= self.attack_count <= 30 
+        swing_3_active_window = 45 <= self.attack_count <= 50
+
         # Update attack_rect relative to current direction & frame
         if self.attacking and self.attack_count in (5,25,45):
+            self.zombies_hit.clear()
 
-            face_right = not self.x_flip #if facing right, it will be true
+        face_right = not self.x_flip #if facing right, it will be true
 
+        if self.attacking and (swing_1_active_window or swing_2_active_window or swing_3_active_window):
             if self.aim_up:
                 if face_right is True:
                     self.attack_rect = pygame.Rect(self.rect.x + 5, self.rect.top - 10, 50, 40)
@@ -318,31 +323,64 @@ class Player:
                 elif self.aim_left:
                     self.attack_rect = pygame.Rect(self.rect.left-27, self.rect.y, 40, 32)
         else:
-            self.attack_rect = pygame.Rect(0, 0, 0, 0)
-            self.critical_rect = pygame.Rect(0,0,0,0)
+            self.attack_rect = None
+            self.critical_rect = None
         
 
-    def attack(self,zombie_damaged, zombie_hitbox, zombie_head_hitbox, player_damage, freeze_frame_counter):
-        if self.attack_rect.colliderect(zombie_hitbox) and self.attacked is True:
-            print('TAKE THAT')
+    def attack(self,zombie_list, freeze_frame_counter):
 
-            self.combo_stage*= self.combo_multipliers[self.hit_number%3] #cycles through the multipliers as the attack goes on
-            self.combo_stage = round(self.combo_stage, 3) 
-            player_damage = self.base_ATK*(self.combo_stage)
-            zombie_damaged = True
-            self.attacked = False
-            self.hit_landed = True
+        if self.attack_rect == None: #if the attack hitbox hasnt been activated then don't run this function
+            return 0 #<-- return 0 player_damage
 
-            if self.critical_rect.colliderect(zombie_head_hitbox):
-                freeze_frame_counter = 5     
-                self.y_momentum = -3
-            else:
-                freeze_frame_counter = 3
+        player_damage = 0 #<-- reset the damage before every attack
+
+        #instead of looping in the main code, we loop through all the zombies within the function itself
+        for zombie in zombie_list:
+            if self.attack_rect.colliderect(zombie.rect):
+                if zombie not in self.zombies_hit: #if the zombies arent in the most recently hit then function normally or else ignore to prevent double damaging
+
+                    self.combo_stage*= self.combo_multipliers[self.hit_number%3] #cycles through the multipliers as the attack goes on
+                    self.combo_stage = round(self.combo_stage, 3) 
+                    player_damage = self.base_ATK*(self.combo_stage)
+
+
+                    zombie.damaged = True
+                    zombie.receive_damage(player_damage)
+                    zombie.calculate_knockback(self.aim_up,self.aim_down, self.x_flip, self.rect, self.on_ground, self.mom_force, self.attack_count)
+                    self.zombies_hit.append(zombie)
+                    freeze_frame_counter = 3
+
+                    if self.critical_rect == None:
+                        return player_damage
+                    else:
+                        if self.critical_rect.colliderect(zombie.head_rect):
+                            freeze_frame_counter = 5     
+                            self.y_momentum = -3
+                        
+        
+        return player_damage, freeze_frame_counter
+
+        # if self.attack_rect.colliderect(zombie_hitbox) and self.attacked is True:
+        #     print('TAKE THAT')
+
+        #     self.combo_stage*= self.combo_multipliers[self.hit_number%3] #cycles through the multipliers as the attack goes on
+        #     self.combo_stage = round(self.combo_stage, 3) 
+        #     player_damage = self.base_ATK*(self.combo_stage)
+        #     zombie_damaged = True
+        #     self.attacked = False
+        #     self.hit_landed = True
+
+        #     if self.critical_rect.colliderect(zombie_head_hitbox):
+        #         freeze_frame_counter = 5     
+        #         self.y_momentum = -3
+        #     else:
+        #         freeze_frame_counter = 3
 
             
 
-        return zombie_damaged, player_damage, freeze_frame_counter
+        # return zombie_damaged, player_damage, freeze_frame_counter
 
+        
 
     def calculate_screen_shake(self, player_damage, horizontal_cam_shake, vertical_cam_shake):
 
@@ -367,19 +405,26 @@ class Player:
 
 
 
-    def receive_damage(self, zombie_damage):
-            if self.damaged is True:
-                if self.invulnerable == False: 
-                    self.HP -= zombie_damage
-                    self.damaged = False
-                    if self.HP > 0:
-                        print(f'i have been hit by this filthy zombie for {zombie_damage} and now im {self.HP}. my maxHP is {self.max_HP}')
-                    else:
-                        print(f'im supposed to be dead')
+    def receive_damage(self, zombie_damage, freeze_frames):
+        if self.damaged is True:
+            if self.invulnerable == False: 
+                self.HP -= zombie_damage
+                self.damaged = False
+                freeze_frames = 2  
+                if self.HP > 0:
+                    print(f'i have been hit by this filthy zombie for {zombie_damage} and now im {self.HP}. my maxHP is {self.max_HP}') 
+               
                 else:
-                    print('im invulnerable')
-                    self.damaged = False
-            
+                    print(f'im supposed to be dead')
+
+
+                
+            else:
+                print('im invulnerable')
+                self.damaged = False
+
+        return freeze_frames
+        
 
     def dead_check(self):
         if self.HP <= 0:
@@ -396,9 +441,14 @@ zombies = []
 
 class Zombie:
 
-    def __init__(self, rect, head_rect, movement, x_push_momentum, y_push_momentum, y_momentum, x_flip, render_pos, on_ground, idle_move, chase_player, chase_speed ,
-                 attack_count, knocked, damaged, staggered,stag_count,max_stag_count, HP, ATK):
+    def __init__(self, rect,current_frames,animation_mode, frame_index, animation_count, head_rect, movement, x_push_momentum,
+                  y_push_momentum, y_momentum, x_flip, render_pos, on_ground, idle_move, chase_player, chase_speed ,
+                 attack_count, player_touch_cooldown, touched_player, knocked, damaged, staggered,stag_count,max_stag_count, HP, ATK):
         self.rect = rect
+        self.current_frames = current_frames
+        self.animation_mode = animation_mode
+        self.frame_index = frame_index
+        self.animation_count = animation_count
         self.head_rect = head_rect
         self.movement = movement
         self.x_push_momentum = x_push_momentum
@@ -411,6 +461,8 @@ class Zombie:
         self.chase_player = chase_player
         self.chase_speed = chase_speed
         self.attack_count = attack_count
+        self.player_touch_cooldown = player_touch_cooldown
+        self.touched_player = touched_player
         self.knocked = knocked
         self.damaged = damaged
         self.staggered = staggered
@@ -444,11 +496,29 @@ class Zombie:
             
     def touch_player(self, player_hitbox):
         if self.rect.colliderect(player_hitbox):
-            self.attack_count += 1
+            self.touched_player = True
+        else:
+            self.touched_player = False
 
-    def attack_player(self, player_damaged): #add player hp in paranthesis
-        if self.attack_count >= 60:         
+    def check_cooldown(self):
+        if self.touched_player == True:
+            self.attack_count += 1
+            self.player_touch_cooldown = 0
+        else:
+            if self.attack_count > 0: #if the zombie was in the process of attacking the player but was interrupted
+                self.player_touch_cooldown += 1
+
+        if self.player_touch_cooldown > 30:
+            self.attack_count = 0
+    
+    def attack_player(self, player_damaged): 
+
+        if self.attack_count == 37:  #the zombie hits the player at the end of the 4th frame    
             player_damaged = True
+            return player_damaged
+
+
+        if self.attack_count >= 60:         
             self.attack_count = 0
 
             return player_damaged
@@ -460,6 +530,9 @@ class Zombie:
             self.HP -= player_damage
             self.HP = round(self.HP, 2)
             print(f'you hurt me bruh, im now {self.HP}')
+            if not self.staggered:
+                self.attack_count = 0  # Reset attack only once upon being hit
+                self.animation_count = 0
             self.damaged = False
             self.staggered = True
             self.knocked = True
@@ -593,7 +666,6 @@ class Zombie:
 
     def check_staggered(self):
         if self.staggered is True:
-            self.attack_count = 0
             self.stag_count += 1
 
         if self.stag_count >= self.max_stag_count: #staggered for how long the zombie should be staggered for (base duration is 45 aka 3/4 sec)
@@ -602,10 +674,61 @@ class Zombie:
     
 
 
+    def update_action (self, all_frames):
+        
+        if self.animation_mode == 0: 
+            self.current_frames = all_frames[0:1]
+
+        if self.animation_mode == 1: 
+            self.current_frames = all_frames[1:3]
+
+        if self.animation_mode == 2: 
+            self.current_frames = all_frames[4:6]
+        
+        if self.animation_mode == 3: 
+            self.current_frames = all_frames[7:9]
+
+        if self.animation_mode == 4: 
+            self.current_frames = all_frames[10:12]
+
+        if self.animation_mode == 5: 
+            self.current_frames = all_frames[13:17]
+
+        if self.animation_mode == 6: 
+            self.current_frames = all_frames[18:22]
 
 
-        #checks if it is in x distance from the player
-        #returns boolean to change the zombie behaviour in movement
+        return self.current_frames
+
+    
+    def update_zombie_frame (self): #math for frame indexing
+        
+        self.animation_count += 1
+
+        if self.current_frames == None or self.current_frames == []:
+            return self.animation_mode
+
+        if self.animation_mode == 0: #idle
+            self.frame_index = 0
+
+        if self.animation_mode == 1: #walk right 
+            self.frame_index = (self.animation_count // 20) % len(self.current_frames)
+
+        if self.animation_mode == 2: #walk left
+            self.frame_index = (self.animation_count // 20) % len(self.current_frames)
+
+        if self.animation_mode == 3: #chase right
+            self.frame_index = (self.animation_count // 20) % len(self.current_frames)
+
+        if self.animation_mode == 4: #chase left
+            self.frame_index = (self.animation_count // 20) % len(self.current_frames)
+
+        if self.animation_mode == 5: #attack right
+            self.frame_index = (self.animation_count // 12) % len(self.current_frames)
+
+        if self.animation_mode == 6: #attack left
+            self.frame_index = (self.animation_count // 12) % len(self.current_frames)
+
 
 
 
