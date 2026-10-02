@@ -15,13 +15,13 @@
         "S_COIN": null
     },
     "position": {
-        "x": 64,
-        "y": 224
+        "x": 100,
+        "y": 200
     },
     "world": {
-        "current_stage": 1,
-        "map_seed": 5841,
-        "spritesheet": "asset/exclusion_spritesheet.png",
-        "zombie_count": 3
+        "current_stage": null,
+        "map_seed": null,
+        "spritesheet": null,
+        "zombie_count": null
     }
 }

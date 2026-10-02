@@ -147,9 +147,9 @@ player = Player(
     dash = False,
     dashing = False,
     dash_buffer = 0,
-    max_dash_buffer = 0, #120
+    max_dash_buffer = 120, #120
     max_dash_charges = 2, #2
-    dash_charges = 100,  #2
+    dash_charges = 2,  #2
     dash_dis = 15,
     dash_counter = 0,
     press_space = False,
@@ -369,6 +369,13 @@ def load_stage(stage_number, saved_seed=None, saved_spritesheet=None, reset_play
         new_seed = random.randint(1,10000)
         current_spritesheet = Spritesheet(spritesheet_pool[map_index])
         spritesheet_pool.pop(map_index)
+    elif stage_number == 5:
+        new_seed = 69420
+        current_spritesheet = Spritesheet('asset/castle_spritesheet.png')
+    else:
+        pygame.quit()
+        sys.exit()
+
 
     current_map_seed = new_seed
 
@@ -408,7 +415,15 @@ def load_stage(stage_number, saved_seed=None, saved_spritesheet=None, reset_play
         bg.add_layer('asset/industrial/industrial_far_buildings.png', scroll_factor=0.2)
         bg.add_layer('asset/industrial/industrial_building.png',scroll_factor=0.2)
         bg.add_layer('asset/industrial/industrial_foreground.png',scroll_factor=0.2)
-        
+
+    elif active_spritesheet == 'asset/castle_spritesheet.png':
+        bg.add_layer('asset/station/station_bg.png', scroll_factor=0.0)
+        bg.add_layer('asset/station/station_detail.png', scroll_factor=0.2)
+        bg.add_layer('asset/station/station_train.png',scroll_factor=0.2)
+        bg.add_layer('asset/station/station_underfloor.png',scroll_factor=0.2)
+        bg.add_layer('asset/station/station_columns.png',scroll_factor=0.2)
+        bg.add_layer('asset/station/station_infopost.png',scroll_factor=0.4)
+        bg.add_layer('asset/station/station_wires.png',scroll_factor=0.2)
 
 
     print(
@@ -499,12 +514,13 @@ def save_current_game():
 
 
 #note for rendering: whatever is first rendered in the loop will be behind while whatever is last rendered in the loop will be in the very front
-# *--GAME LOOP--*
+#*--GAME LOOP--*
 if isinstance(saved_stage, int) and saved_stage >= 1 and saved_seed is not None and saved_spritesheet:
     current_stage = saved_stage
     load_stage(current_stage, saved_seed, saved_spritesheet, reset_player=False)
 else:
     load_stage(current_stage)
+
 
 while True: 
 
