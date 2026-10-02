@@ -237,8 +237,8 @@ def apply_skill_effects(player, tree, heal_on_gain=True):
     player.crit_chance_bonus = fx["crit_chance"]
     player.crit_dmg_bonus = fx["crit_damage"]
 
-    base_cd = getattr(player, "base_combo_cooldown", player.combo_cooldown)
-    player.combo_cooldown = max(MIN_COMBO_COOLDOWN, round(base_cd / (1.0 + fx["attack_speed_pct"])))
+    # base_cd = getattr(player, "base_combo_cooldown", player.combo_cooldown)
+    # player.combo_cooldown = max(MIN_COMBO_COOLDOWN, round(base_cd / (1.0 + fx["attack_speed_pct"])))
 
     # Survival stats
     player.damage_reduction = min(0.9, fx["damage_reduction"])
