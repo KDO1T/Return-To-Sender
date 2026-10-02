@@ -146,7 +146,7 @@ player = Player(
     aim_right = False,
     aim_left = False,
     y_momentum = 0,
-    max_air_jumps = 2,
+    max_air_jumps = 100,
     jump = False,
     jump_height = 4.5,
     on_ground = None,
@@ -415,19 +415,23 @@ while True:
                 player_vec = pygame.math.Vector2(player.rect.center)
                 for orb in orbs[:]:
                     if not orb.consumed:
-                        orb_vec = pygame.math.Vector2(orb.rect.center)
-                        if player_vec.distance_to(orb_vec) <= 45:
-                            # Roll RNG chance (or guaranteed if all zombies are killed)
-                            shop_active = True
-                            shop_timer = 7.0
-                            shop_accessed = True
-                            shop_message = "Shop Unlocked!"
-                                
-                            
-                            shop_msg_timer = 120
-                            orb.consumed = True
-                            orbs.remove(orb)
-                            break
+                        if not orb.consumed:
+                            orb_vec = pygame.math.Vector2(orb.rect.center)
+
+                            if player_vec.distance_to(orb_vec) <= 45:
+
+                                if orb.guaranteed or random.random() < orb.chance:
+                                    shop_active = True
+                                    shop_timer = 7.0
+                                    shop_accessed = True
+                                    shop_message = "Shop Unlocked!"
+                                else:
+                                    shop_message = "The Orb Exploded - No Shop Access!"
+
+                                shop_msg_timer = 120
+                                orb.consumed = True
+                                orbs.remove(orb)
+                                break
 
         if event.type == pygame.KEYDOWN and event.key == pygame.K_F5:
             update_settings_file()
@@ -945,8 +949,8 @@ while True:
                 if random.random() < 0.1:
                     orbs.append(Orb(
                         pygame.Rect(zombie.rect.x, zombie.rect.y, 16, 16),
-                        guaranteed=True,
-                        chance=1.0
+                        guaranteed=False,
+                        chance=0.1
                     ))
 
             elif stage_dead_zombies == 20:
@@ -1194,7 +1198,7 @@ while True:
         shop_overlay.fill((0, 0, 0, 205))
         canvas.blit(shop_overlay, (0, 0))
 
-        shop_title = font_pause_title.render("AUGMENT SHOP", True, (240, 240, 240))
+        shop_title = font_pause_title.render("Perks SHOP", True, (240, 240, 240))
         canvas.blit(shop_title, shop_title.get_rect(center=(base_res_x / 2, 45)))
 
         card_w, card_h = 120, 180

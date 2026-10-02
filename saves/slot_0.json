@@ -1,0 +1,39 @@
+{
+    "slot_index": 0,
+    "name": "Save 1",
+    "brightness": 50,
+    "player": {
+        "Name": null,
+        "HP": -150,
+        "max_HP": 50,
+        "base_ATK": 5,
+        "CRIT_DMG": 1.5,
+        "CRIT_CHANCE": 0.05,
+        "LEVEL": 1,
+        "EXP": 0,
+        "DOLLARS": 0,
+        "S_COIN": 566
+    },
+    "position": {
+        "x": 12392,
+        "y": 224
+    },
+    "world": {
+        "current_stage": 4,
+        "map_seed": 69420,
+        "spritesheet": "plague_spritesheet.png",
+        "zombie_count": 6
+    },
+    "skill_tree": {
+        "purchased": [
+            "attack_damage",
+            "crit_chance",
+            "attack_speed",
+            "crit_damage",
+            "movement_speed",
+            "blade_damage",
+            "blade_attack_speed"
+        ],
+        "ranged_unlocked": false
+    }
+}
