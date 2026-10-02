@@ -129,15 +129,15 @@ font_perk_desc = pygame.font.Font("fonts/VT323/VT323.ttf", 14)
 
 # *------------------------------------------------------------------- PERKS DATA -----------------------------------------------------------------------------------------*
 PERKS = [
-    {"name": "Ignition Edge", "desc": "Melee hits have a 30% chance to set zombies on fire, dealing 15 burn damage over 3 seconds.", "rarity": "Budget", "weight": 60, "cost": 15},
-    {"name": "Conductive Blade", "desc": "Every 3rd melee swing releases a shockwave that arcs lightning to 2 nearby zombies for 50% damage.", "rarity": "Budget", "weight": 60, "cost": 15},
-    {"name": "Heavy Cleave", "desc": "Increases your melee swing arc size by 35% and increases knockback force by 50%.", "rarity": "Mid", "weight": 30, "cost": 30},
-    {"name": "Phantom Step", "desc": "Dodging through a zombie renders you briefly invulnerable and grants +25% move speed for 2.5s.", "rarity": "Mid", "weight": 30, "cost": 30},
-    {"name": "Executioner", "desc": "+35% bonus damage against zombies that are burning, shocked, or below 30% HP.", "rarity": "Mid", "weight": 30, "cost": 30},
-    {"name": "Blood Siphon", "desc": "Melee kills restore 4% Max HP. Parrying or blocking an attack heals 6 HP.", "rarity": "High", "weight": 10, "cost": 60},
-    {"name": "Ironclad Guard", "desc": "Reduces incoming damage from behind by 40% and grants immunity.", "rarity": "High", "weight": 10, "cost": 60},
-    {"name": "Retaliatory Pulse", "desc": "Taking damage releases a kinetic shockwave that knocks back all surrounding zombies & stuns them.", "rarity": "High", "weight": 10, "cost": 60},
-    {"name": "Final Arsenal", "desc": "+15% raw melee damage. Converts into +35% Ranged Dmg & +50% Reload Speed when Gun is unlocked.", "rarity": "High", "weight": 10, "cost": 60}
+    {"name": "Ignition Edge", "desc": "Melee hits have a 30% chance to set zombies on fire, dealing 15 burn damage over 3 seconds.", "rarity": "Budget", "weight": 26, "cost": 15},
+    {"name": "Conductive Blade", "desc": "Every 3rd melee swing releases a shockwave that arcs lightning to 2 nearby zombies for 50% damage.", "rarity": "Budget", "weight": 26, "cost": 15},
+    {"name": "Heavy Cleave", "desc": "Increases your melee swing arc size by 35% and increases knockback force by 50%.", "rarity": "Mid", "weight": 8, "cost": 30},
+    {"name": "Phantom Step", "desc": "Dodging through a zombie renders you briefly invulnerable and grants +25% move speed for 2.5s.", "rarity": "Mid", "weight": 8, "cost": 30},
+    {"name": "Executioner", "desc": "+35% bonus damage against zombies that are burning, shocked, or below 30% HP.", "rarity": "Mid", "weight": 8, "cost": 30},
+    {"name": "Blood Siphon", "desc": "Melee kills restore 4% Max HP. Parrying or blocking an attack heals 6 HP.", "rarity": "High", "weight": 1, "cost": 60},
+    {"name": "Ironclad Guard", "desc": "Reduces incoming damage from behind by 40% and grants immunity.", "rarity": "High", "weight": 1, "cost": 60},
+    {"name": "Retaliatory Pulse", "desc": "Taking damage releases a kinetic shockwave that knocks back all surrounding zombies & stuns them.", "rarity": "High", "weight": 1, "cost": 60},
+    {"name": "Final Arsenal", "desc": "+15% raw melee damage. Converts into +35% Ranged Dmg & +50% Reload Speed when Gun is unlocked.", "rarity": "High", "weight": 1, "cost": 60}
 ]
 
 # *------------------------------------------------------------------- MAP STUFF -----------------------------------------------------------------------------------------*
@@ -1297,11 +1297,11 @@ while True:
                 print(f"Zombie killed: {stage_dead_zombies}")
 
                 if 7 <= stage_dead_zombies < 20:
-                    if random.random() < 0.1:
+                    if random.random() < 0.5:   # Orb drop chance
                         orbs.append(Orb(
                             pygame.Rect(zombie.rect.x, zombie.rect.y, 16, 16),
                             guaranteed=False,
-                            chance=0.1
+                            chance=0.7   # RNG Shop
                         ))
 
                 elif stage_dead_zombies == 20:
