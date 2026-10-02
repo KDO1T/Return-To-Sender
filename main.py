@@ -40,6 +40,25 @@ def create_brightness_surface(value):
 
     return brightness_surface
 
+# Text Wrapper Helper
+def draw_text_wrapped(surface, text, color, rect, font, line_spacing=2):
+    words = text.split(' ')
+    lines = []
+    current_line = []
+    for word in words:
+        test_line = ' '.join(current_line + [word])
+        if font.size(test_line)[0] <= rect.width:
+            current_line.append(word)
+        else:
+            lines.append(' '.join(current_line))
+            current_line = [word]
+    lines.append(' '.join(current_line))
+    
+    y_offset = rect.y
+    for line in lines:
+        text_surf = font.render(line, True, color)
+        surface.blit(text_surf, (rect.x, y_offset))
+        y_offset += font.get_linesize() + line_spacing
 
 pygame.init()
 
@@ -84,14 +103,13 @@ control_keys = {
 }
 
 #camera movement
-camera_x=0 #made it the same as the player's coordinates
-camera_y=0 #made it the same as the player's coordinates
+camera_x=0 
+camera_y=0 
 x_camera_delay = 0
 y_camera_delay = 0
-camera_speed=5 #will make this the difference in current player coordinates 
+camera_speed=5  
 
 
-#1. initiliaze pygame, 2. names the window, 3. sets the window size and sets its paramaters
 pygame.display.set_caption("Return To Sender") 
 canvas = pygame.Surface((base_res_x, base_res_y))
 screen = pygame.display.set_mode((screen_state_w, screen_state_h), status)
@@ -99,12 +117,28 @@ screen = pygame.display.set_mode((screen_state_w, screen_state_h), status)
 brightness_surface = create_brightness_surface(brightness)
 
 
-clock = pygame.time.Clock() #assigning the clock function to a variable to use for the fps in the gameloop
+clock = pygame.time.Clock() 
 
-
+# Fonts
 font_pause_title = pygame.font.Font("fonts/Press_Start_2P/PressStart2P.ttf", 24)
 font_pause = pygame.font.Font("fonts/VT323/VT323.ttf", 34)
 font_pause_small = pygame.font.Font("fonts/VT323/VT323.ttf", 26)
+font_perk_title = pygame.font.Font("fonts/VT323/VT323.ttf", 18)
+font_perk_desc = pygame.font.Font("fonts/VT323/VT323.ttf", 14)
+
+
+# *------------------------------------------------------------------- PERKS DATA -----------------------------------------------------------------------------------------*
+PERKS = [
+    {"name": "Ignition Edge", "desc": "Melee hits have a 30% chance to set zombies on fire, dealing 15 burn damage over 3 seconds.", "rarity": "Budget", "weight": 60, "cost": 15},
+    {"name": "Conductive Blade", "desc": "Every 3rd melee swing releases a shockwave that arcs lightning to 2 nearby zombies for 50% damage.", "rarity": "Budget", "weight": 60, "cost": 15},
+    {"name": "Heavy Cleave", "desc": "Increases your melee swing arc size by 35% and increases knockback force by 50%.", "rarity": "Mid", "weight": 30, "cost": 30},
+    {"name": "Phantom Step", "desc": "Dodging through a zombie renders you briefly invulnerable and grants +25% move speed for 2.5s.", "rarity": "Mid", "weight": 30, "cost": 30},
+    {"name": "Executioner", "desc": "+35% bonus damage against zombies that are burning, shocked, or below 30% HP.", "rarity": "Mid", "weight": 30, "cost": 30},
+    {"name": "Blood Siphon", "desc": "Melee kills restore 4% Max HP. Parrying or blocking an attack heals 6 HP.", "rarity": "High", "weight": 10, "cost": 60},
+    {"name": "Ironclad Guard", "desc": "Reduces incoming damage from behind by 40% and grants immunity.", "rarity": "High", "weight": 10, "cost": 60},
+    {"name": "Retaliatory Pulse", "desc": "Taking damage releases a kinetic shockwave that knocks back all surrounding zombies & stuns them.", "rarity": "High", "weight": 10, "cost": 60},
+    {"name": "Final Arsenal", "desc": "+15% raw melee damage. Converts into +35% Ranged Dmg & +50% Reload Speed when Gun is unlocked.", "rarity": "High", "weight": 10, "cost": 60}
+]
 
 # *------------------------------------------------------------------- MAP STUFF -----------------------------------------------------------------------------------------*
 current_spritesheet = None
@@ -218,12 +252,16 @@ spawned_chunks = set()
 stage_spawned_zombies = 0
 stage_dead_zombies = 0
 stage_max_zombies = 20
+
 shop_active = False
 shop_timer = 0.0
 shop_accessed = False
 orbs = []
 shop_message = ""
 shop_msg_timer = 0
+current_shop_perks = []
+purchases_allowed = 1
+current_purchases = 0
 
 spritesheet_pool = ['grass_spritesheet.png','cartoon_spritesheet.png']
 
@@ -296,7 +334,6 @@ skill_ui = SkillTreeUI(skill_tree, base_res_x, base_res_y)
 def pause_button_rects():
     return [pygame.Rect(220, 100 + index * 42, 200, 38) for index in range(5)]
 
-
 def close_skill_tree():
     global pause_state, paused
     pause_state = "PAUSE"
@@ -368,21 +405,34 @@ while True:
             pygame.quit()
             sys.exit()
 
-        # Clicking an augment card selects it and immediately closes the shop.
+        # Perks Card Selection Logic
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and shop_active:
             mouse_x = event.pos[0] * base_res_x / screen_state_w
             mouse_y = event.pos[1] * base_res_y / screen_state_h
 
             card_w, card_h = 120, 180
-            start_x = (base_res_x - (3 * card_w + 2 * 30)) // 2
+            shop_slots = len(current_shop_perks)
+            start_x = (base_res_x - (shop_slots * card_w + (shop_slots - 1) * 30)) // 2
             card_y = 85
 
-            for i in range(3):
+            for i in range(shop_slots):
                 card_x = start_x + i * (card_w + 30)
                 card_rect = pygame.Rect(card_x, card_y, card_w, card_h)
+                
                 if card_rect.collidepoint(mouse_x, mouse_y):
-                    shop_active = False
-                    shop_timer = 0.0
+                    perk = current_shop_perks[i]
+                    if perk is not None:
+                        if (player.DOLLARS or 0) >= perk["cost"]:
+                            player.DOLLARS = (player.DOLLARS or 0) - perk["cost"]
+                            if not hasattr(player, 'active_perks'): 
+                                player.active_perks = []
+                            player.active_perks.append(perk)
+                            current_shop_perks[i] = None 
+                            current_purchases += 1
+                            
+                            if current_purchases >= purchases_allowed:
+                                shop_active = False
+                                shop_timer = 0.0
                     break
 
         if event.type == pygame.KEYDOWN and pause_rebinding_control is not None and paused and pause_state == "OPTIONS" and pause_options_state == "CONTROLS":
@@ -415,23 +465,36 @@ while True:
                 player_vec = pygame.math.Vector2(player.rect.center)
                 for orb in orbs[:]:
                     if not orb.consumed:
-                        if not orb.consumed:
-                            orb_vec = pygame.math.Vector2(orb.rect.center)
+                        orb_vec = pygame.math.Vector2(orb.rect.center)
 
-                            if player_vec.distance_to(orb_vec) <= 45:
+                        if player_vec.distance_to(orb_vec) <= 45:
 
-                                if orb.guaranteed or random.random() < orb.chance:
-                                    shop_active = True
-                                    shop_timer = 7.0
-                                    shop_accessed = True
-                                    shop_message = "Shop Unlocked!"
-                                else:
-                                    shop_message = "The Orb Exploded - No Shop Access!"
+                            if orb.guaranteed or random.random() < orb.chance:
+                                shop_active = True
+                                shop_timer = 15.0 
+                                shop_accessed = True
+                                shop_message = "Shop Unlocked!"
+                                
+                                # Setup Perk Selection parameters based on Skill Tree
+                                num_slots = 3 + getattr(player, 'shop_slots', 0) 
+                                purchases_allowed = 1 + getattr(player, 'purchase_limit', 0)
+                                current_purchases = 0
+                                current_shop_perks = []
+                                
+                                temp_perks = list(PERKS)
+                                for _ in range(num_slots):
+                                    if not temp_perks: break
+                                    weights = [p['weight'] for p in temp_perks]
+                                    chosen = random.choices(temp_perks, weights=weights, k=1)[0]
+                                    current_shop_perks.append(chosen)
+                                    temp_perks.remove(chosen)
+                            else:
+                                shop_message = "The Orb Exploded - No Shop Access!"
 
-                                shop_msg_timer = 120
-                                orb.consumed = True
-                                orbs.remove(orb)
-                                break
+                            shop_msg_timer = 120
+                            orb.consumed = True
+                            orbs.remove(orb)
+                            break
 
         if event.type == pygame.KEYDOWN and event.key == pygame.K_F5:
             update_settings_file()
@@ -450,6 +513,7 @@ while True:
 
         if DEBUG_SOUL_COINS and event.type == pygame.KEYDOWN and event.key == pygame.K_F6:
             player.S_COIN = (player.S_COIN or 0) + 0
+            player.DOLLARS = (player.DOLLARS or 0) + 50 
 
         # Pause menu mouse controls
         if paused:
@@ -1198,26 +1262,60 @@ while True:
         shop_overlay.fill((0, 0, 0, 205))
         canvas.blit(shop_overlay, (0, 0))
 
-        shop_title = font_pause_title.render("Perks SHOP", True, (240, 240, 240))
-        canvas.blit(shop_title, shop_title.get_rect(center=(base_res_x / 2, 45)))
+        shop_title = font_pause_title.render("PERKS SHOP", True, (240, 240, 240))
+        canvas.blit(shop_title, shop_title.get_rect(center=(base_res_x / 2, 30)))
+
+        # DOLLARS Display restricted exclusively to shop UI
+        dollars_text = font_pause_small.render(f"Dollars: ${player.DOLLARS or 0}", True, (50, 255, 50))
+        canvas.blit(dollars_text, dollars_text.get_rect(center=(base_res_x / 2, 55)))
 
         card_w, card_h = 120, 180
-        start_x = (base_res_x - (3 * card_w + 2 * 30)) // 2
+        shop_slots = len(current_shop_perks)
+        start_x = (base_res_x - (shop_slots * card_w + (shop_slots - 1) * 30)) // 2
         card_y = 85
 
-        for i in range(3):
+        for i in range(shop_slots):
             card_x = start_x + i * (card_w + 30)
             card_rect = pygame.Rect(card_x, card_y, card_w, card_h)
             
-            # Static black augment card background
-            pygame.draw.rect(canvas, (0, 0, 0), card_rect)
-            # Card border
-            pygame.draw.rect(canvas, (70, 70, 90), card_rect, 3)
+            perk = current_shop_perks[i]
+            
+            # Handle purchased / empty slots
+            if perk is None:
+                pygame.draw.rect(canvas, (30, 30, 30), card_rect)
+                pygame.draw.rect(canvas, (70, 70, 70), card_rect, 3)
+                sold_out = font_pause_small.render("SOLD", True, (255, 50, 50))
+                canvas.blit(sold_out, sold_out.get_rect(center=card_rect.center))
+                continue
+                
+            # Render Base Card Background
+            pygame.draw.rect(canvas, (10, 10, 15), card_rect)
 
-            card_num = font_pause_small.render(f"Card {i+1}", True, (120, 120, 120))
-            canvas.blit(card_num, card_num.get_rect(center=card_rect.center))
+            # Rarity Specific Visuals
+            if perk['rarity'] == 'Budget':
+                border_color = (150, 255, 150) # Light Green
+            elif perk['rarity'] == 'Mid':
+                border_color = (100, 150, 255) # Light Blue
+            else:
+                border_color = (255, 200, 50)  # Gold
+                
+            pygame.draw.rect(canvas, border_color, card_rect, 3)
 
-        timer_text = font_pause_small.render(f"TIME: {max(0, shop_timer):.1f}", True, (240, 240, 240))
+            # Draw Perk Title
+            name_text = font_perk_title.render(perk['name'], True, border_color)
+            canvas.blit(name_text, name_text.get_rect(midtop=(card_rect.centerx, card_rect.y + 10)))
+            
+            # Draw Detailed Wrapped Text Description
+            desc_rect = pygame.Rect(card_rect.x + 8, card_rect.y + 35, card_rect.width - 16, card_rect.height - 60)
+            draw_text_wrapped(canvas, perk['desc'], (200, 200, 200), desc_rect, font_perk_desc)
+
+            # Draw Cost at the bottom of the card
+            cost_text = font_perk_desc.render(f"${perk['cost']}", True, (50, 255, 50))
+            canvas.blit(cost_text, cost_text.get_rect(midbottom=(card_rect.centerx, card_rect.bottom - 10)))
+
+
+        timer_string = f"TIME: {max(0, shop_timer):.1f}  |  Purchases Left: {purchases_allowed - current_purchases}"
+        timer_text = font_pause_small.render(timer_string, True, (240, 240, 240))
         canvas.blit(timer_text, timer_text.get_rect(center=(base_res_x / 2, 310)))
 
     # Apply brightness & final render
