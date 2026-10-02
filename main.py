@@ -1066,7 +1066,7 @@ while True:
     
     # *---------------------------------------------------------------------------
     #                                       FREEZE FRAME
-
+    
     if hit_freeze_timer == None:
         hit_freeze_timer = 0
 
@@ -1222,7 +1222,7 @@ while True:
         total_damage = 0
         player.check_cooldown()
         player.update_attack_hitbox()
-        applied_damage = player.attack(zombies, hit_freeze_timer) 
+        applied_damage, hit_freeze_timer = player.attack(zombies, hit_freeze_timer) 
 
         for zombie in zombies:
             zombie.check_staggered()    

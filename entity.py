@@ -344,7 +344,7 @@ class Player:
     def attack(self,zombie_list, freeze_frame_counter):
 
         if self.attack_rect == None: #if the attack hitbox hasnt been activated then don't run this function
-            return 0 #<-- return 0 player_damage
+            return 0, freeze_frame_counter#<-- return 0 player_damage
 
         player_damage = 0 #<-- reset the damage before every attack
 
@@ -360,8 +360,11 @@ class Player:
                     self.combo_stage = round(self.combo_stage, 3) 
 
                     #External multiplier
+                    print(self.combo_stage)
+                    print(self.damage_mult)
                     player_damage =(self.base_ATK or 0) * self.damage_mult **(self.combo_stage)
-
+                    print(player_damage)
+                    
                     #Crit multiplier
                     crit_chance = (self.CRIT_CHANCE if self.CRIT_CHANCE is not None else 0.05) + self.crit_chance_bonus
                     crit_damage = (self.CRIT_DMG if self.CRIT_DMG is not None else 1.5) + self.crit_dmg_bonus
@@ -369,6 +372,7 @@ class Player:
                         player_damage *= crit_damage
 
                     zombie.damaged = True
+                    self.hit_landed = True
                     zombie.receive_damage(player_damage)
      
             
@@ -377,10 +381,10 @@ class Player:
 
                     zombie.calculate_knockback(self.aim_up,self.aim_down, self.x_flip, self.rect, self.on_ground, self.mom_force, self.attack_count)
                     self.zombies_hit.append(zombie)
-                    freeze_frame_counter = 3
+                    freeze_frame_counter = 2
 
                     if self.critical_rect == None:
-                        return player_damage
+                        return player_damage, freeze_frame_counter
                     else:
                         if self.critical_rect.colliderect(zombie.head_rect):
                             freeze_frame_counter = 5     
