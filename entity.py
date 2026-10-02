@@ -83,7 +83,7 @@ class Player:
         if self.animation_mode == 3: #fall
             self.current_frames = self.all_frames[15:17]
 
-        if self.animation_mode == 4: #fall
+        if self.animation_mode == 4: #attack
             self.current_frames = self.all_frames[18:21]
         
 
@@ -108,9 +108,6 @@ class Player:
             self.frame_index = (self.animation_count // 20) % len(self.current_frames)
 
         if self.animation_mode == 4: #attacking
-           pass # self.frame_index = (self.animation_count // 20) % len(self.current_frames)
-
-        if self.animation_mode == 4: #attacking
             if self.animation_count < 7:  #wind up
                 self.frame_index = 0
             elif self.animation_count < 10: #attacking
@@ -125,9 +122,7 @@ class Player:
         return self.animation_count, self.frame_index
 
 
-
     def check_cooldown(self):
-
 
         if self.combo_window > 0: #if player hasn't executed the next move in the combo, it will minus 1 from the frames in the 'window' of the move
             self.combo_window -= 1 
@@ -201,10 +196,6 @@ class Player:
             #death animation/ death screen
             pass
         
-
-
-            
-        
     
 zombies = []
 #stores each zombie's attributes within the Zombie class
@@ -234,8 +225,6 @@ class Zombie:
         self.ATK = ATK
 
 
-
-
     def generate_rect(self, i, player_current_chunk_x):
         self.rect = pygame.Rect(((player_current_chunk_x + 640) + (i*30)), 50, 20,32)
 
@@ -248,21 +237,16 @@ class Zombie:
             self.chase_player = True 
         else:
             self.chase_player = False
-
-
             
     def touch_player(self, player_hitbox):
         if self.rect.colliderect(player_hitbox):
             self.attack_count += 1
 
-    def attack_player(self, player_damaged): #add player hp in paranthesis
+    def attack_player(self, player_hp): #add player hp in paranthesis
         if self.attack_count >= 60:         
-            player_damaged = True
             self.attack_count = 0
-
-            return player_damaged
-
-
+            return True
+        return False
 
     def receive_damage(self, player_damage):
         if self.damaged == True:
@@ -275,8 +259,6 @@ class Zombie:
     def dead_check(self, zomb_index):
         if self.HP <= 0:
             return zomb_index
-
-
 
     def calculate_knockback(self, player_force, player_direction, player_rect ):
         if self.knocked == True:
@@ -292,28 +274,6 @@ class Zombie:
 
             self.knocked = False
 
-
-
-        pass
-
-    
-        # if self.knocked == True:
-    
-        #     if player_direction == False: #facing right
-        #         self.rect.left = player_rect.right
-        #         self.x_momentum += player_force//2
-        #         self.y_momentum += -player_force//10
-
-        #     if player_direction == True: #facing left
-        #         self.rect.right = player_rect.left
-        #         self.x_momentum -= player_force//2
-        #         self.y_momentum += -player_force//10
-
-            
-            
-        #     self.knocked = False #put this into Y knockback code
-        #     print('i got knocked')
-
     def check_staggered(self):
         if self.staggered is True:
             self.stag_count += 1
@@ -321,15 +281,21 @@ class Zombie:
         if self.stag_count >= self.max_stag_count: #staggered for how long the zombie should be staggered for (base duration is 45 aka 3/4 sec)
             self.staggered = False
             self.stag_count = 0
-    
 
 
+class Orb:
+    def __init__(self, rect, guaranteed=False, chance=0.5):
+        self.rect = rect
+        self.guaranteed = guaranteed
+        self.chance = chance
+        self.consumed = False
 
+    def draw(self, surface, camera_x, camera_y, x_camera_delay, y_camera_delay):
+        render_x = self.rect.x - camera_x - x_camera_delay
+        render_y = self.rect.y - camera_y - y_camera_delay
 
-        #checks if it is in x distance from the player
-        #returns boolean to change the zombie behaviour in movement
-
-
-
-
-
+        # Outer ring
+        color = (255, 215, 0) if self.guaranteed else (180, 100, 255)
+        pygame.draw.circle(surface, color, (int(render_x + 8), int(render_y + 8)), 10, 2)
+        # Inner solid glowing core
+        pygame.draw.circle(surface, (255, 255, 255), (int(render_x + 8), int(render_y + 8)), 6)
