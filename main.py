@@ -220,6 +220,7 @@ player = Player(
     combo_stage = 1,
     combo_buffer= 0,
     zombies_hit = [],
+    active_perks = [],
     CRIT_DMG=None, 
     CRIT_CHANCE=None, 
     LEVEL=None, 
@@ -250,7 +251,7 @@ for i in range(23):
 
 # *------------------------------ANIMATION------------------------------------------------------------------------
 
-jimmy_sheet = Spritesheet('animations/spritesheets/jimmy_sheet2.png')
+jimmy_sheet = Spritesheet('animations/spritesheets/jimmy_sheet.png')
 
 #LOAD PLAYER ANIMATIONS:
 
@@ -318,11 +319,11 @@ for i in range(4):# 120:123, mode 17
     filename = f'dash_left_{i}'
     player.all_frames.append(jimmy_sheet.parse_sprite(filename))
 
-filename = 'damage_right'
-player.all_frames.append(jimmy_sheet.parse_sprite(filename))
+# filename = 'damage_right'
+# player.all_frames.append(jimmy_sheet.parse_sprite(filename))
 
-filename = 'damage_left'
-player.all_frames.append(jimmy_sheet.parse_sprite(filename))
+# filename = 'damage_left'
+# player.all_frames.append(jimmy_sheet.parse_sprite(filename))
 
 
 
@@ -424,6 +425,8 @@ def load_stage(stage_number, saved_seed=None, saved_spritesheet=None, reset_play
         player.rect.x = (stage_min_chunk_x + 1)*world.chunk_pixel_w + 64
         player.rect.y = 100
 
+    return stage_min_chunk_x
+
 """------------------------------------------------------- In-Game Pause Menu ---------------------------------------------------------------"""
 
 paused = False
@@ -502,9 +505,9 @@ def save_current_game():
 # *--GAME LOOP--*
 if isinstance(saved_stage, int) and saved_stage >= 1 and saved_seed is not None and saved_spritesheet:
     current_stage = saved_stage
-    load_stage(current_stage, saved_seed, saved_spritesheet, reset_player=False)
+    stage_min_chunk_x = load_stage(current_stage, saved_seed, saved_spritesheet, reset_player=False)
 else:
-    load_stage(current_stage)
+    stage_min_chunk_x = load_stage(current_stage)
 
 
 hit_freeze_timer = 0
@@ -545,6 +548,7 @@ while True:
                             player.DOLLARS = (player.DOLLARS or 0) - perk["cost"]
                             if not hasattr(player, 'active_perks'): 
                                 player.active_perks = []
+                                print(perk)
                             player.active_perks.append(perk)
                             current_shop_perks[i] = None 
                             current_purchases += 1
@@ -1332,7 +1336,7 @@ while True:
 
             hit_freeze_timer = player.receive_damage(zombie.ATK, hit_freeze_timer)
 
-        player.dead_check()
+        current_stage = player.dead_check(current_stage, stage_min_chunk_x, world.chunk_pixel_w)
 
         
         

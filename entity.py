@@ -9,7 +9,7 @@ class Player:
                  hor_aim_list, holding_up, holding_down, vert_aim_list, aim_up,aim_down, dash_charges,max_dash_buffer,dash_buffer, 
                  max_dash_charges, aim_right, aim_left, press_space,y_momentum,x_momentum, max_air_jumps,jump,jump_height,on_ground,x_flip,
                    all_frames ,current_frames ,frame_index, animation_mode,animation_count,max_HP,i_counter,invulnerable, damaged,base_ATK,attacking,
-                     holding_attack,attack_count,combo_stage, hit_landed, combo_buffer, zombies_hit,
+                     holding_attack,attack_count,combo_stage, hit_landed, combo_buffer, zombies_hit, active_perks,
                     CRIT_DMG, CRIT_CHANCE, LEVEL, EXP, DOLLARS, S_COIN):
         self.Name = Name
         self.rect = rect
@@ -66,6 +66,7 @@ class Player:
         self.hit_number = 0
         self.zombies_hit = []
         self.combo_buffer = combo_buffer #time between each slash of the combo
+        self.active_perks = active_perks
         self.CRIT_DMG = CRIT_DMG
         self.CRIT_CHANCE = CRIT_CHANCE
         self.LEVEL = LEVEL
@@ -477,15 +478,22 @@ class Player:
         return freeze_frames
         
 
-    def dead_check(self):
+    def dead_check(self, stage_position, stage_min_chunk_x, chunk_pixel_w):
         if self.HP <= 0:
-            self.DOLLARS 
-            #reset map position
-            #reset dollars
-            #reset perks
-            #reset everything except soul coins
-            #death animation/ death screen
-            pass
+            print('you dead')
+            # self.DOLLARS = 0
+            # self.active_perks = []
+            # stage_position = 1
+            # self.rect.x = (stage_min_chunk_x + 1)*chunk_pixel_w + 64
+            # self.rect.y = 100
+            
+            # return stage_position
+            # #reset map position
+        #     #reset dollars
+        #     #reset perks
+        #     #reset everything except soul coins
+        #     #death animation/ death screen
+        return stage_position
         
     
 zombies = []
