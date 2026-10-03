@@ -140,6 +140,10 @@ PERKS = [
     {"name": "Final Arsenal", "desc": "+15% raw melee damage. Converts into +35% Ranged Dmg & +50% Reload Speed when Gun is unlocked.", "rarity": "High", "weight": 1, "cost": 60}
 ]
 
+
+
+
+
 # *------------------------------------------------------------------- MAP STUFF -----------------------------------------------------------------------------------------*
 current_spritesheet = None
 current_map_seed = None
@@ -175,6 +179,7 @@ player = Player(
     rect = pygame.Rect(100, 200, 32, 32),
     attack_rect = None,
     critical_rect = None,
+    shock_rect = None,
     movement=[0,0],
     moving_up = False,
     moving_down = False,
@@ -227,7 +232,16 @@ player = Player(
     LEVEL=None, 
     EXP=None, 
     DOLLARS=None, 
-    S_COIN=None
+    S_COIN=None,
+    ignition_edge=False,
+    conductive_blade=False,
+    heavy_cleave=False,
+    phantom_step=False,
+    executioner_stance=False,
+    blood_siphon=False,
+    ironclad_guard=False,
+    retaliatory_pulse=False,
+    final_arsenal=False,
 )
 
 player_rect = player.rect
@@ -1165,7 +1179,7 @@ while True:
                     pygame.Rect(spawn_x, spawn_y, 32 ,32), [],0,0,0,None,
                     [0,0], 0 , 0 , 0, False, (0,0), False, 
                     'Still', False, random.randint(1,3),0,0, False,
-                    False, False, False, 0, 45, int(current_stage*5 + 15), 
+                    False, False, False, 0, 45, False, 240, int(current_stage*5 + 15), 
                     int(current_stage*2 + 5)
                 )
                 new_zombie.head_rect = new_zombie.generate_head_rect() #make head rect for critical hit
@@ -1233,8 +1247,16 @@ while True:
         hit_freeze_timer -= 1
     else:
 
-        # *---------------------------------------------------------------------------
+     
 
+    # ---------------------------------PERKS------------------------------------------------------------------
+    
+        player.check_perks()
+        player.conductive_blade = True
+
+
+
+   # *---------------------------------------------------------------------------
         # *--PLAYER HORIZONTAL MOVEMENT + COLLISIONS--*
 
         player.init_dash()
@@ -1402,6 +1424,7 @@ while True:
         applied_damage, hit_freeze_timer = player.attack(zombies, hit_freeze_timer) 
 
         for zombie in zombies:
+            zombie.check_on_fire()
             zombie.check_staggered()    
             del_zomb = zombie.dead_check(zomb_no)
             if del_zomb is not None:
@@ -1416,7 +1439,7 @@ while True:
                         orbs.append(Orb(
                             pygame.Rect(zombie.rect.x, zombie.rect.y, 16, 16),
                             guaranteed=False,
-                            chance=0.7   # RNG Shop
+                            chance=0.7  # RNG Shop
                         ))
 
                 elif stage_dead_zombies == 20:
@@ -1446,9 +1469,7 @@ while True:
 
         
         
-        
-        
-        
+    
     # *---------------------------------------ENTITIES---------------------------------------------------------
 
 
@@ -1867,6 +1888,9 @@ while True:
     # if player.attack_rect is not None and player.critical_rect is not None:
     #     pygame.draw.rect(canvas, (255, 0, 0), (player.attack_rect.x - camera_x - x_camera_delay, player.attack_rect.y - camera_y -y_camera_delay, player.attack_rect.width, player.attack_rect.height), 2)
     #     pygame.draw.rect(canvas, (0, 255, 0), (player.critical_rect.x - camera_x - x_camera_delay, player.critical_rect.y - camera_y -y_camera_delay, player.critical_rect.width, player.critical_rect.height), 2)
+    if player.shock_rect is not None:
+        pygame.draw.rect(canvas, (0, 0, 255), (player.shock_rect.x - camera_x - x_camera_delay, player.shock_rect.y - camera_y -y_camera_delay, player.shock_rect.width, player.shock_rect.height), 2)
+        
         
     #new player render code:
     # above this will be the code determining the sprite and rect
@@ -1879,11 +1903,21 @@ while True:
             zombie.current_frames = zombie.update_action(all_zombie_frames) #determines the current type of animation playing only if the animation mode changes
             zombie.update_zombie_frame() #update frame played and returns the animation mode
             zombie_sprite = zombie.current_frames[zombie.frame_index] #determines the image/sprite which will be displayed on player pos
+
+            if zombie.on_fire:
+            #creating fire overlay
+                fire_version = zombie_sprite.copy()
+                fire_overlay = pygame.Surface(fire_version.get_size(), pygame.SRCALPHA)
+                fire_overlay.fill((255, 165, 0)) 
+                fire_version.blit(fire_overlay, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+                zombie_sprite = fire_version
+            else:
+                pass
             if zombie.animation_mode != 0:
                 canvas.blit(zombie_sprite, zombie.render_pos) 
             else:
                 canvas.blit(pygame.transform.flip(zombie_sprite, zombie.x_flip, False), (zombie.render_pos))
-    
+
 
     # *-- RENDER SHOP ORBS --*
     player_vec = pygame.math.Vector2(player.rect.center)
