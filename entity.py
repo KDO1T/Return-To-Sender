@@ -402,10 +402,10 @@ class Player:
             if self.shock_rect != None:
                 if self.shock_rect.colliderect(zombie.rect):
                     if zombie.rect.x < self.rect.x: #if the zombie is to the left of the player
-                        x_shock_knockback = -20
+                        x_shock_knockback = -10
                         y_shock_knockback = -10
                     else:   #if the player is to the right of the player
-                        x_shock_knockback = 20
+                        x_shock_knockback = 10
                         y_shock_knockback = -10
 
             if self.attack_rect.colliderect(zombie.rect) or (self.shock_rect is not None and self.shock_rect.colliderect(zombie.rect)) :
