@@ -5,16 +5,20 @@ class Player:
     # *--STATS--*
     #level is the player's level, while exp is what the player gains to increase in level
     #dollars is the money the player gains throughout runs while s_coin (soul coins) is the metacurrency
-    def __init__(self, Name,rect,attack_rect,critical_rect, movement,moving_up,moving_down ,moving_right ,moving_left,dash, dashing,dash_dis,dash_counter, 
+    def __init__(self, Name,rect,attack_rect,critical_rect,shock_rect,retaliate_rect, movement,moving_up,moving_down ,moving_right ,moving_left,dash, dashing,dash_dis,dash_counter, 
                  hor_aim_list, holding_up, holding_down, vert_aim_list, aim_up,aim_down, dash_charges,max_dash_buffer,dash_buffer, 
                  max_dash_charges, aim_right, aim_left, press_space,y_momentum,x_momentum, max_air_jumps,jump,jump_height,on_ground,x_flip,
                    all_frames ,current_frames ,frame_index, animation_mode,animation_count,max_HP,i_counter,invulnerable, damaged,base_ATK,attacking,
-                     holding_attack,attack_count,combo_stage, hit_landed, combo_buffer, zombies_hit,
-                    CRIT_DMG, CRIT_CHANCE, LEVEL, EXP, DOLLARS, S_COIN):
+                     holding_attack,attack_count,combo_stage, hit_landed, combo_buffer, zombies_hit, active_perks,
+                    CRIT_DMG, CRIT_CHANCE, LEVEL, EXP, DOLLARS, S_COIN, 
+                    ignition_edge, conductive_blade, heavy_cleave,phantom_step, executioner_stance, 
+                    blood_siphon, ironclad_guard, retaliatory_pulse, final_arsenal, dash_speed_count, increase_move_speed, retaliate):
         self.Name = Name
         self.rect = rect
         self.attack_rect = attack_rect #contains hitbox for each attack
         self.critical_rect = critical_rect #contains smaller hitbox that if the player manages to hit, will boost his damage/knockback
+        self.shock_rect = shock_rect
+        self.retaliate_rect = retaliate_rect
         self.movement = movement
         self.moving_up = moving_up
         self.moving_down = moving_down
@@ -66,12 +70,28 @@ class Player:
         self.hit_number = 0
         self.zombies_hit = []
         self.combo_buffer = combo_buffer #time between each slash of the combo
+        self.active_perks = active_perks
         self.CRIT_DMG = CRIT_DMG
         self.CRIT_CHANCE = CRIT_CHANCE
         self.LEVEL = LEVEL
         self.EXP = EXP 
         self.DOLLARS = DOLLARS
         self.S_COIN = S_COIN
+        self.dash_speed_count = dash_speed_count
+        self.increase_move_speed = increase_move_speed
+        self.retaliate = retaliate
+        # PERKS
+        self.ignition_edge = ignition_edge
+        self.conductive_blade = conductive_blade
+        self.heavy_cleave = heavy_cleave
+        self.phantom_step = phantom_step
+        self.executioner_stance = executioner_stance
+        self.blood_siphon = blood_siphon
+        self.ironclad_guard = ironclad_guard
+        self.retaliatory_pulse = retaliatory_pulse
+        self.final_arsenal = final_arsenal
+
+
 
         # *--SKILL TREE--*
         # Filled in by skill_tree.apply_skill_effects(). The defaults below mean "no upgrades".
@@ -85,6 +105,18 @@ class Player:
         self.damage_reduction = 0.0
         self.knockback_resist = 0.0         #no player knockback exists yet, ready for when it does
         self.bonus_max_HP = 0               #max HP that comes from the skill tree (not saved as base)
+
+ 
+
+
+
+
+
+
+
+
+
+
 
     def update_action (self):
         
@@ -141,7 +173,13 @@ class Player:
 
         if self.animation_mode == 17: 
             self.current_frames = self.all_frames[120:123]
-    
+
+        # if self.animation_mode == 18:
+        #     self.current_frames = self.all_frames[123:124]
+
+        # if self.animation_mode == 19:
+        #     self.current_frames = self.all_frames[124:125]    
+
         return self.current_frames
 
     
@@ -207,10 +245,20 @@ class Player:
         if self.animation_mode == 17: 
             self.frame_index = (self.animation_count // 5) % len(self.current_frames)
 
+        # if self.animation_mode == 18:
+        #     self.frame_index = 0
+
+        # if self.animation_mode == 19: 
+        #     self.frame_index = 0
+
 
     def init_dash(self):
 
         if self.dash == True: #when you press the button
+            if self.phantom_step:
+                self.increase_move_speed = True
+                self.dash_speed_count = 150
+        
             if self.dash_charges > 0 and not self.dashing: #if you have a charge and you aren't currenly dashing
                 self.dashing = True
                 self.dash_charges -= 1
@@ -220,6 +268,14 @@ class Player:
         
 
     def check_cooldown(self):
+
+        #phantom step
+
+        if self.increase_move_speed == True:
+            self.dash_speed_count -= 1
+            if self.dash_speed_count <= 0:
+                self.increase_move_speed = False
+
 
 
         #iframes
@@ -314,44 +370,94 @@ class Player:
 
         face_right = not self.x_flip #if facing right, it will be true
 
+
         if self.attacking and (swing_1_active_window or swing_2_active_window or swing_3_active_window):
+
+            if self.conductive_blade and swing_3_active_window:
+                self.shock_rect = pygame.Rect(self.rect.centerx - 75, self.rect.y-15, 150, 50)
+
+            if self.heavy_cleave:
+                x_size_increase = 20
+                y_size_increase = -10
+            else:
+                x_size_increase = 0
+                y_size_increase = 0
+            
             if self.aim_up:
                 if face_right is True:
-                    self.attack_rect = pygame.Rect(self.rect.x + 5, self.rect.top - 10, 50, 40)
+                    self.attack_rect = pygame.Rect(self.rect.x + 5 , self.rect.top - 10, 50 + x_size_increase, 40 -y_size_increase)
                 else:
-                    self.attack_rect = pygame.Rect(self.rect.x - 23, self.rect.top -10, 50, 40)
+                    self.attack_rect = pygame.Rect(self.rect.x - 23 - x_size_increase, self.rect.top -10, 50 + x_size_increase, 40 -y_size_increase)
 
 
             elif self.aim_down and not self.on_ground :
                 if face_right is True:
-                    self.critical_rect = pygame.Rect(self.rect.x +3 , self.rect.bottom + 5, 20,15)
-                    self.attack_rect = pygame.Rect(self.rect.x - 20, self.rect.bottom - 15, 68, 36)
+                    self.critical_rect = pygame.Rect(self.rect.x +3 , self.rect.bottom + 5, 20 ,15)
+                    self.attack_rect = pygame.Rect(self.rect.x - 20, self.rect.bottom - 15, 68 +  + x_size_increase, 36 -y_size_increase)
                 else:
                     self.critical_rect = pygame.Rect(self.rect.x +11, self.rect.bottom + 5, 20,15)
-                    self.attack_rect = pygame.Rect(self.rect.x - 10, self.rect.bottom - 15, 68, 36)
+                    self.attack_rect = pygame.Rect(self.rect.x - 10 +y_size_increase, self.rect.bottom - 15, 68  + x_size_increase, 36 -y_size_increase)
             
             else:
 
                 if self.aim_right:
-                    self.attack_rect = pygame.Rect(self.rect.right-13, self.rect.y, 40, 32)
+                    self.attack_rect = pygame.Rect(self.rect.right-13 , self.rect.y, 40 + x_size_increase, 32 -y_size_increase)
                 elif self.aim_left:
-                    self.attack_rect = pygame.Rect(self.rect.left-27, self.rect.y, 40, 32)
+                    self.attack_rect = pygame.Rect(self.rect.left-27 - x_size_increase, self.rect.y, 40 + x_size_increase, 32 -y_size_increase)
         else:
             self.attack_rect = None
             self.critical_rect = None
+            self.shock_rect = None
+
         
 
-    def attack(self,zombie_list, freeze_frame_counter):
+    def attack(self,zombie_list, freeze_frame_counter, current_stage):
 
         if self.attack_rect == None: #if the attack hitbox hasnt been activated then don't run this function
             return 0, freeze_frame_counter#<-- return 0 player_damage
 
         player_damage = 0 #<-- reset the damage before every attack
 
+        if self.executioner_stance:
+            execute_damage = 5
+        else:
+            execute_damage = 0
+
+        if self.final_arsenal:
+            arsenal_damage = self.base_ATK * 0.15
+        else:
+            arsenal_damage = 0
+
         #instead of looping in the main code, we loop through all the zombies within the function itself
         for zombie in zombie_list:
-            if self.attack_rect.colliderect(zombie.rect):
+            x_shock_knockback = 0
+            y_shock_knockback = 0
+            if self.shock_rect != None:
+                if self.shock_rect.colliderect(zombie.rect):
+                    if zombie.rect.x < self.rect.x: #if the zombie is to the left of the player
+                        x_shock_knockback = -10
+                        y_shock_knockback = -10
+                    else:   #if the player is to the right of the player
+                        x_shock_knockback = 10
+                        y_shock_knockback = -10
+
+            if self.attack_rect.colliderect(zombie.rect) or (self.shock_rect is not None and self.shock_rect.colliderect(zombie.rect)) :
                 if zombie not in self.zombies_hit: #if the zombies arent in the most recently hit then function normally or else ignore to prevent double damaging
+
+                    
+                    if self.ignition_edge:
+                        #chance to set on fire
+                        if random.random() <= 0.30:
+                            zombie.on_fire = True
+                            zombie.fire_count = 240
+                        else:
+                            pass
+
+                    if self.conductive_blade and self.shock_rect is not None and self.shock_rect.colliderect(zombie.rect):
+                        zombie.shocked = True
+                        zombie.shocked_count = 120
+                    else:
+                        pass
 
                     #Damage Calculation:
 
@@ -362,27 +468,41 @@ class Player:
                     #External multiplier
                     print(self.combo_stage)
                     print(self.damage_mult)
-                    player_damage =(self.base_ATK or 0) * self.damage_mult **(self.combo_stage)
+                    player_damage =(self.base_ATK or 0) * self.damage_mult * (self.combo_stage)
                     print(player_damage)
+
+                    #Executioner stance multiplier
+                    if zombie.on_fire or zombie.shocked or (zombie.HP <= int(current_stage*5 + 15)*0.3):
+                        player_damage += execute_damage
+                    else:
+                        pass
+
+                    if self.final_arsenal:
+                        player_damage += arsenal_damage
+                    else:
+                        pass
                     
                     #Crit multiplier
                     crit_chance = (self.CRIT_CHANCE if self.CRIT_CHANCE is not None else 0.05) + self.crit_chance_bonus
                     crit_damage = (self.CRIT_DMG if self.CRIT_DMG is not None else 1.5) + self.crit_dmg_bonus
                     if random.random() < crit_chance:
                         player_damage *= crit_damage
- 
+
                     zombie.damaged = True
                     self.hit_landed = True
                     zombie.receive_damage(player_damage)
      
             
                     print(f'damaged for {player_damage}!')
-                   
 
-                    zombie.calculate_knockback(self.aim_up,self.aim_down, self.x_flip, self.rect, self.on_ground, self.mom_force, self.attack_count)
+
                     self.zombies_hit.append(zombie)
                     self.hit_number += 1
                     freeze_frame_counter = 2
+
+                    heavy_knockback = self.heavy_cleave
+
+                    zombie.calculate_knockback(self.aim_up,self.aim_down, self.x_flip, self.rect, self.on_ground, self.mom_force, self.attack_count, x_shock_knockback, y_shock_knockback, heavy_knockback)
 
                     if self.critical_rect == None:
                         return player_damage, freeze_frame_counter
@@ -393,27 +513,6 @@ class Player:
                         
         
         return player_damage, freeze_frame_counter
-
-        # if self.attack_rect.colliderect(zombie_hitbox) and self.attacked is True:
-        #     print('TAKE THAT')
-
-        #     self.combo_stage*= self.combo_multipliers[self.hit_number%3] #cycles through the multipliers as the attack goes on
-        #     self.combo_stage = round(self.combo_stage, 3) 
-        #     player_damage = self.base_ATK*(self.combo_stage)
-        #     zombie_damaged = True
-        #     self.attacked = False
-        #     self.hit_landed = True
-
-        #     if self.critical_rect.colliderect(zombie_head_hitbox):
-        #         freeze_frame_counter = 5     
-        #         self.y_momentum = -3
-        #     else:
-        #         freeze_frame_counter = 3
-
-
-            
-
-        # return zombie_damaged, player_damage, freeze_frame_counter
 
         
 
@@ -438,36 +537,81 @@ class Player:
 
         return horizontal_cam_shake, vertical_cam_shake
 
+    def retaliatory_rect_collision(self, zombies):
+        self.retaliate_rect = None
 
+        if self.retaliate:
+            self.retaliate_rect = pygame.Rect(self.rect.centerx - 100, self.rect.top-32, 200, 75)
+     
+
+            
+        for zombie in zombies:
+            if self.retaliate_rect is not None:
+                if self.retaliate_rect.colliderect(zombie.rect):
+
+                    if zombie.rect.x > self.rect.x: #to the right of the player
+                        negative_mult = 1
+                    else:#to the left of the player
+                        negative_mult = -1
+                    zombie.x_push_momentum += 15 * negative_mult
+                    zombie.y_push_momentum -= 15
+            else:
+                pass
+
+        self.retaliate = False
 
     def receive_damage(self, zombie_damage, freeze_frames):
         if self.damaged is True:
-
+            if self.retaliatory_pulse:
+                self.retaliate = True
+            else:
+                pass
+            self.damaged = False
             if self.invulnerable == False: 
                 zombie_damage = max(1, round(zombie_damage * (1 - self.damage_reduction)))
+                print(zombie_damage)
+                print('HP:', self.HP)
                 self.HP -= zombie_damage
-                self.damaged = False
+             
                 freeze_frames = 2  
-                if self.HP > 0:
-                    print(f'i have been hit by this filthy zombie for {zombie_damage} and now im {self.HP}. my maxHP is {self.max_HP}') 
-               
-                else:
-                    print(f'im supposed to be dead')
-
 
                 
 
             else:
-                print('im invulnerable')
                 self.damaged = False
 
         return freeze_frames
-        
 
-    def dead_check(self):
+    def check_perks(self):
+        perk_names = {perk["name"] for perk in self.active_perks}
+        self.ignition_edge = "Ignition Edge" in perk_names
+        self.conductive_blade = "Conductive Blade" in perk_names
+        self.heavy_cleave = "Heavy Cleave" in perk_names
+        self.phantom_step = "Phantom Step" in perk_names
+        self.executioner_stance = "Executioner" in perk_names
+        self.blood_siphon = "Blood Siphon" in perk_names
+        self.retaliatory_pulse = "Retaliatory Pulse" in perk_names
+        self.final_arsenal = "Final Arsenal" in perk_names
+
+    
+
+    
+    def dead_check(self, stage_position, stage_min_chunk_x, chunk_pixel_w):
         if self.HP <= 0:
-            #death animation/ death screen
-            pass
+            print('you dead')
+            # self.DOLLARS = 0
+            # self.active_perks = []
+            # stage_position = 1
+            # self.rect.x = (stage_min_chunk_x + 1)*chunk_pixel_w + 64
+            # self.rect.y = 100
+            
+            # return stage_position
+            # #reset map position
+        #     #reset dollars
+        #     #reset perks
+        #     #reset everything except soul coins
+        #     #death animation/ death screen
+        return stage_position
         
     
 zombies = []
@@ -477,7 +621,8 @@ class Zombie:
 
     def __init__(self, rect,current_frames,animation_mode, frame_index, animation_count, head_rect, movement, x_push_momentum,
                   y_push_momentum, y_momentum, x_flip, render_pos, on_ground, idle_move, chase_player, chase_speed ,
-                 attack_count, player_touch_cooldown, touched_player, knocked, damaged, staggered,stag_count,max_stag_count, HP, ATK):
+                 attack_count, player_touch_cooldown, touched_player, knocked, damaged, staggered,stag_count,max_stag_count, 
+                 on_fire, fire_count, shocked, shocked_count, HP, ATK):
         self.rect = rect
         self.current_frames = current_frames
         self.animation_mode = animation_mode
@@ -502,9 +647,32 @@ class Zombie:
         self.staggered = staggered
         self.stag_count = stag_count
         self.max_stag_count = max_stag_count
+        self.on_fire = on_fire
+        self.fire_count = fire_count #<-- set to 240 (4 seconds)
+        self.shocked = shocked
+        self.shocked_count = shocked_count
         self.HP = HP
         self.ATK = ATK
 
+
+    def check_on_fire(self):
+        if self.on_fire:
+            self.fire_count -= 1
+            if self.fire_count <= 0:
+                self.on_fire = False
+
+        if self.on_fire:
+            if self.fire_count % 60 == 0: #every 1 tic
+                self.HP -= 1
+                print('ow that fire hurt')
+            else:
+                pass
+
+    def check_shocked(self):
+        if self.shocked:
+            self.shocked_count -= 1
+            if self.shocked_count <= 0:
+                self.shocked = False
 
 
 
@@ -544,7 +712,7 @@ class Zombie:
             self.attack_count = 0
     
     def attack_player(self, player_damaged): 
-
+        
         if self.attack_count == 37:  #the zombie hits the player at the end of the 4th frame    
             player_damaged = True
             return player_damaged
@@ -573,8 +741,9 @@ class Zombie:
 
 
 
-    def calculate_knockback(self, up_force,down_force, player_x_direction, player_rect, mid_air, player_force, player_attack_count):
+    def calculate_knockback(self, up_force,down_force, player_x_direction, player_rect, mid_air, player_force, player_attack_count, x_shock_knockback, y_shock_knockback, heavy_cleave_bool):
 
+      
         if self.knocked == True:
 
             if not mid_air: #air knockback 
@@ -637,7 +806,7 @@ class Zombie:
                         elif player_attack_count >= 5: #light up, light side --> light-to-medium up, light side --> little up, a lot of up
                             self.x_push_momentum -= player_force//4
                             self.y_push_momentum += -player_force*1.2
-                        
+  
         
             else: #ground knockback
     
@@ -686,6 +855,22 @@ class Zombie:
                             self.x_push_momentum -= player_force//4
                             self.y_push_momentum += -player_force
 
+
+            if heavy_cleave_bool:
+                if player_x_direction == False: #facing right
+                    x_heavy_knockback = 20
+                    y_heavy_knockback = -10
+                else: #facing left
+                    x_heavy_knockback = -20
+                    y_heavy_knockback = -10
+            else:
+                x_heavy_knockback = 0
+                y_heavy_knockback = 0
+    
+
+            #shock knockback
+            self.x_push_momentum += x_shock_knockback + x_heavy_knockback
+            self.y_push_momentum += y_shock_knockback + y_heavy_knockback
 
 
 

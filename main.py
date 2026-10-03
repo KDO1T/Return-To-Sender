@@ -122,9 +122,10 @@ canvas = pygame.Surface((base_res_x, base_res_y))
 screen = pygame.display.set_mode((screen_state_w, screen_state_h), status)
 
 brightness_surface = create_brightness_surface(brightness)
-
+fader = StageFade(canvas)
 
 clock = pygame.time.Clock() 
+
 
 # Fonts
 font_pause_title = pygame.font.Font("fonts/Press_Start_2P/PressStart2P.ttf", 24)
@@ -150,6 +151,10 @@ PERKS = [
     {"name": "Retaliatory Pulse", "desc": "Taking damage releases a kinetic shockwave that knocks back all surrounding zombies & stuns them.", "rarity": "High", "weight": 1, "cost": 60},
     {"name": "Final Arsenal", "desc": "+15% raw melee damage. Converts into +35% Ranged Dmg & +50% Reload Speed when Gun is unlocked.", "rarity": "High", "weight": 1, "cost": 60}
 ]
+
+
+
+
 
 # *------------------------------------------------------------------- MAP STUFF -----------------------------------------------------------------------------------------*
 current_spritesheet = None
@@ -186,6 +191,8 @@ player = Player(
     rect = pygame.Rect(100, 200, 32, 32),
     attack_rect = None,
     critical_rect = None,
+    shock_rect = None,
+    retaliate_rect = None,
     movement=[0,0],
     moving_up = False,
     moving_down = False,
@@ -220,7 +227,7 @@ player = Player(
     frame_index = 0,
     animation_mode = 0,
     animation_count = 0,    
-    max_HP = 50,
+    max_HP = 100,
     i_counter = 0,
     invulnerable= False,
     damaged=False,
@@ -232,12 +239,25 @@ player = Player(
     combo_stage = 1,
     combo_buffer= 0,
     zombies_hit = [],
+    active_perks = [],
     CRIT_DMG=None, 
     CRIT_CHANCE=None, 
     LEVEL=None, 
     EXP=None, 
     DOLLARS=None, 
-    S_COIN=None
+    S_COIN=None,
+    ignition_edge=False,
+    conductive_blade=False,
+    heavy_cleave=False,
+    phantom_step=False,
+    executioner_stance=False,
+    blood_siphon=False,
+    ironclad_guard=False,
+    retaliatory_pulse=False,
+    final_arsenal=False,
+    dash_speed_count = 150,
+    increase_move_speed = False,
+    retaliate = False
 )
 
 player_rect = player.rect
@@ -332,6 +352,11 @@ for i in range(4):# 120:123, mode 17
     filename = f'dash_left_{i}'
     player.all_frames.append(jimmy_sheet.parse_sprite(filename))
 
+# filename = 'damage_right'
+# player.all_frames.append(jimmy_sheet.parse_sprite(filename))
+
+# filename = 'damage_left'
+# player.all_frames.append(jimmy_sheet.parse_sprite(filename))
 
 
 
@@ -403,6 +428,8 @@ def load_stage(stage_number, saved_seed=None, saved_spritesheet=None, reset_play
     shop_timer = 0.0
     shop_accessed = False
     shop_message = ""
+    fader.reset_fade()
+    
 
     world.last_obstacle_col = -999
 
@@ -516,6 +543,8 @@ def load_stage(stage_number, saved_seed=None, saved_spritesheet=None, reset_play
         player.rect.x = (stage_min_chunk_x + 1)*world.chunk_pixel_w + 64
         player.rect.y = 100
 
+    return stage_min_chunk_x
+
 """------------------------------------------------------- In-Game Pause Menu ---------------------------------------------------------------"""
 
 paused = False
@@ -584,9 +613,9 @@ def save_current_game():
 #*--GAME LOOP--*
 if isinstance(saved_stage, int) and saved_stage >= 1 and saved_seed is not None and saved_spritesheet:
     current_stage = saved_stage
-    load_stage(current_stage, saved_seed, saved_spritesheet, reset_player=False)
+    stage_min_chunk_x = load_stage(current_stage, saved_seed, saved_spritesheet, reset_player=False)
 else:
-    load_stage(current_stage)
+    stage_min_chunk_x = load_stage(current_stage)
 
 
 hit_freeze_timer = 0
@@ -596,6 +625,8 @@ while True:
 
     dt = clock.get_time() / 1000.0
     player.jump = False
+
+    fader.update_fade()
 
     # *--INPUT DETECTION--*
     for event in pygame.event.get():
@@ -616,6 +647,7 @@ while True:
             start_x = (base_res_x - (shop_slots * card_w + (shop_slots - 1) * 30)) // 2
             card_y = 85
 
+
             for i in range(shop_slots):
                 card_x = start_x + i * (card_w + 30)
                 card_rect = pygame.Rect(card_x, card_y, card_w, card_h)
@@ -627,6 +659,7 @@ while True:
                             player.DOLLARS = (player.DOLLARS or 0) - perk["cost"]
                             if not hasattr(player, 'active_perks'): 
                                 player.active_perks = []
+                                print(perk)
                             player.active_perks.append(perk)
                             current_shop_perks[i] = None 
                             current_purchases += 1
@@ -1139,7 +1172,7 @@ while True:
                     pygame.Rect(spawn_x, spawn_y, 32 ,32), [],0,0,0,None,
                     [0,0], 0 , 0 , 0, False, (0,0), False, 
                     'Still', False, random.randint(1,3),0,0, False,
-                    False, False, False, 0, 45, int(current_stage*5 + 15), 
+                    False, False, False, 0, 45, False, 240,False, 120, int(current_stage*5 + 15), 
                     int(current_stage*2 + 5)
                 )
                 new_zombie.head_rect = new_zombie.generate_head_rect() #make head rect for critical hit
@@ -1208,8 +1241,13 @@ while True:
         hit_freeze_timer -= 1
     else:
 
-        # *---------------------------------------------------------------------------
+     
 
+    # ---------------------------------PERKS------------------------------------------------------------------
+    
+        player.check_perks()
+
+   # *---------------------------------------------------------------------------
         # *--PLAYER HORIZONTAL MOVEMENT + COLLISIONS--*
 
         player.init_dash()
@@ -1242,23 +1280,29 @@ while True:
         else:
 
             #left and right movement   
+
+            if player.increase_move_speed:
+                x_speed_increase = 2
+            else:
+                x_speed_increase = 0
+
             if player.attacking is True: #slow down movement if the player is attacking
                 if player.moving_right == True:
                     player.movement[0]= 1
-                    player.rect.x += player.movement[0]
+                    player.rect.x += player.movement[0] + x_speed_increase
 
                 if player.moving_left == True:
                     player.movement[0]= -1
-                    player.rect.x += player.movement[0] 
+                    player.rect.x += player.movement[0] - x_speed_increase
                     player.rect.x -= (player.hit_number % 3)*2
 
             else:
                 if player.moving_right == True:
                     player.movement[0]= 4
-                    player.rect.x += player.movement[0]
+                    player.rect.x += player.movement[0] + x_speed_increase
 
                 if player.moving_left == True:
-                    player.movement[0]= -4
+                    player.movement[0]= -4 - x_speed_increase
                     player.rect.x += player.movement[0]
 
 
@@ -1374,16 +1418,18 @@ while True:
         del_zomb = None
         player_damage = 0
         total_damage = 0
+
         player.check_cooldown()
         player.update_attack_hitbox()
-        applied_damage, hit_freeze_timer = player.attack(zombies, hit_freeze_timer) 
+        applied_damage, hit_freeze_timer = player.attack(zombies, hit_freeze_timer, current_stage) 
 
         for zombie in zombies:
+            zombie.check_on_fire()
+            zombie.check_shocked()
             zombie.check_staggered()    
             del_zomb = zombie.dead_check(zomb_no)
             if del_zomb is not None:
                 zombies.pop(del_zomb)
-
                 stage_dead_zombies += 1
                 player.DOLLARS = (player.DOLLARS or 0) + 3
 
@@ -1391,6 +1437,24 @@ while True:
 
                 if getattr(zombie, "stage_final_zombie", False):
                     # The final zombie of the stage always drops the shop orb.
+                
+                print(f"Zombie killed: {stage_dead_zombies}")
+
+                if player.blood_siphon:
+                    siphoned_blood = (0.04*player.max_HP)
+                    player.HP += siphoned_blood
+                else:
+                    pass
+
+                if 7 <= stage_dead_zombies < 20:
+                    if random.random() < 0.1:   # Orb drop chance
+                        orbs.append(Orb(
+                            pygame.Rect(zombie.rect.x, zombie.rect.y, 16, 16),
+                            guaranteed=False,
+                            chance=0.7  # RNG Shop
+                        ))
+
+                elif stage_dead_zombies == 20:
                     orbs.append(Orb(
                         pygame.Rect(zombie.rect.x, zombie.rect.y, 16, 16),
                         guaranteed=True,
@@ -1404,7 +1468,9 @@ while True:
                             chance=0.6   # Shop RNG
                         ))
 
-            zomb_no += 1
+                zomb_no += 1
+
+            
 
         screen_shake_x, screen_shake_y = player.calculate_screen_shake(applied_damage, screen_shake_x, screen_shake_y)
         
@@ -1416,9 +1482,13 @@ while True:
             zombie.touch_player(player.rect)
             zombie.check_cooldown()
             if zombie.staggered == False:
-                player.damaged = zombie.attack_player(player.HP)
+                player.damaged = zombie.attack_player(player.damaged)
+
             hit_freeze_timer = player.receive_damage(zombie.ATK, hit_freeze_timer)
-            player.dead_check()
+
+        player.retaliatory_rect_collision(zombies)
+
+        current_stage = player.dead_check(current_stage, stage_min_chunk_x, world.chunk_pixel_w)
 
         if player.HP <= 0:
             print("Player died - resetting run")
@@ -1456,9 +1526,7 @@ while True:
 
         
         
-        
-        
-        
+    
     # *---------------------------------------ENTITIES---------------------------------------------------------
 
 
@@ -1514,13 +1582,23 @@ while True:
 
                         try:
                             if zombie.rect.centerx > player.rect.centerx:
-                                zombie.movement[0] = -zombie.chase_speed
-                                zombie.rect.x += zombie.movement[0]
+                                if zombie.shocked:
+                                    zombie.movement[0] = -zombie.chase_speed//2
+                                    zombie.rect.x += zombie.movement[0]
+                                else:
+                                    zombie.movement[0] = -zombie.chase_speed
+                                    zombie.rect.x += zombie.movement[0]
+
 
                             if zombie.rect.centerx < player.rect.centerx:
-                                zombie.movement[0] = zombie.chase_speed
-                                zombie.rect.x += zombie.movement[0]
-                                
+                                if zombie.shocked:
+                                    zombie.movement[0] = zombie.chase_speed//2
+                                    zombie.rect.x += zombie.movement[0]
+                                else:
+                                    zombie.movement[0] = zombie.chase_speed
+                                    zombie.rect.x += zombie.movement[0]    
+
+
                         except NameError:
                             pass
 
@@ -1533,13 +1611,21 @@ while True:
                         
                         #move right
                         if zombie.idle_move == 'Right':
-                            zombie.movement[0] = random_zomb_speed
-                            zombie.rect.x += zombie.movement[0]
+                            if zombie.shocked:
+                                zombie.movement[0] = random_zomb_speed//2
+                                zombie.rect.x += zombie.movement[0]
+                            else:
+                                zombie.movement[0] = random_zomb_speed
+                                zombie.rect.x += zombie.movement[0]
 
                         #move left
                         if zombie.idle_move == 'Left':
-                            zombie.movement[0] = -random_zomb_speed
-                            zombie.rect.x += zombie.movement[0]
+                            if zombie.shocked:
+                                zombie.movement[0] = -random_zomb_speed//2
+                                zombie.rect.x += zombie.movement[0]
+                            else:
+                                zombie.movement[0] = -random_zomb_speed
+                                zombie.rect.x += zombie.movement[0]
 
                         #dont move
                         if zombie.idle_move == 'Still':
@@ -1621,6 +1707,7 @@ while True:
         #dashing
         elif player.dashing == True and player.aim_left: 
             player.animation_mode = 17
+
 
         #attacking up while falling
         elif player.on_ground == False and player.y_momentum > 0 and player.attacking and player.aim_up and player.aim_right:#right
@@ -1748,7 +1835,7 @@ while True:
 
     
      #map clamping      
-    max_camera_x = max_world_chunks - base_res_x
+    max_camera_x = max_world_chunks - base_res_x - screen_shake_x - x_camera_delay
     camera_x = max(min_world_chunks, min(camera_x, max_camera_x))
 
     canvas.fill((159, 215, 255))
@@ -1863,19 +1950,33 @@ while True:
     player.current_frames = player.update_action() #determines the current type of animation playing only if the animation mode changes
     player.update_player_frame() #update frame played and returns the animation mode
     player_sprite = player.current_frames[player.frame_index] #determines the image/sprite which will be displayed on player pos
-    canvas.blit(player_sprite, player_render_pos) 
+    canvas.blit(player_sprite, player_render_pos)
+    if player.shock_rect is not None:
+        shock_hitbox = pygame.Surface((player.shock_rect.width,player.shock_rect.height), pygame.SRCALPHA)
+        shock_hitbox.fill((173, 216, 230, 128))
+        canvas.blit(shock_hitbox, (player.shock_rect.x - camera_x - x_camera_delay - screen_shake_x, player.shock_rect.y - camera_y - y_camera_delay - screen_shake_y))
 
+
+    if player.retaliate_rect is not None:
+        retaliate_hitbox = pygame.Surface((player.retaliate_rect.width,player.retaliate_rect.height), pygame.SRCALPHA)
+        retaliate_hitbox.fill((255, 0, 0, 128))
+        canvas.blit(retaliate_hitbox, (player.retaliate_rect.x - camera_x - x_camera_delay - screen_shake_x, player.retaliate_rect.y - camera_y - y_camera_delay - screen_shake_y))
 
     # pygame.draw.rect(canvas, (255,0,0), player.attack_rect)
    
-    for zombie in zombies:
-        pygame.draw.rect(canvas, (0,255, 255), (zombie.rect.x - camera_x - x_camera_delay, zombie.rect.y - camera_y -y_camera_delay, zombie.rect.width, zombie.rect.height))
-    for zombie in zombies:
-        pygame.draw.rect(canvas, (0,0, 255), (zombie.head_rect.x - camera_x - x_camera_delay, zombie.head_rect.y - camera_y -y_camera_delay, zombie.head_rect.width, zombie.head_rect.height))
+    # for zombie in zombies:
+    #     pygame.draw.rect(canvas, (0,255, 255), (zombie.rect.x - camera_x - x_camera_delay, zombie.rect.y - camera_y -y_camera_delay, zombie.rect.width, zombie.rect.height))
+    # for zombie in zombies:
+    #     pygame.draw.rect(canvas, (0,0, 255), (zombie.head_rect.x - camera_x - x_camera_delay, zombie.head_rect.y - camera_y -y_camera_delay, zombie.head_rect.width, zombie.head_rect.height))
     
-    if player.attack_rect is not None and player.critical_rect is not None:
-        pygame.draw.rect(canvas, (255, 0, 0), (player.attack_rect.x - camera_x - x_camera_delay, player.attack_rect.y - camera_y -y_camera_delay, player.attack_rect.width, player.attack_rect.height), 2)
-        pygame.draw.rect(canvas, (0, 255, 0), (player.critical_rect.x - camera_x - x_camera_delay, player.critical_rect.y - camera_y -y_camera_delay, player.critical_rect.width, player.critical_rect.height), 2)
+
+    # if player.attack_rect is not None:
+    #     pygame.draw.rect(canvas, (255, 0, 0), (player.attack_rect.x - camera_x - x_camera_delay, player.attack_rect.y - camera_y -y_camera_delay, player.attack_rect.width, player.attack_rect.height), 2)
+    # if player.critical_rect is not None:   
+    #     pygame.draw.rect(canvas, (0, 255, 0), (player.critical_rect.x - camera_x - x_camera_delay, player.critical_rect.y - camera_y -y_camera_delay, player.critical_rect.width, player.critical_rect.height), 2)
+    # # if player.shock_rect is not None:
+    #     pygame.draw.rect(canvas, (0, 0, 255), (player.shock_rect.x - camera_x - x_camera_delay, player.shock_rect.y - camera_y -y_camera_delay, player.shock_rect.width, player.shock_rect.height), 2)
+        
         
     #new player render code:
     # above this will be the code determining the sprite and rect
@@ -1888,11 +1989,30 @@ while True:
             zombie.current_frames = zombie.update_action(all_zombie_frames) #determines the current type of animation playing only if the animation mode changes
             zombie.update_zombie_frame() #update frame played and returns the animation mode
             zombie_sprite = zombie.current_frames[zombie.frame_index] #determines the image/sprite which will be displayed on player pos
+
+            if zombie.on_fire:
+            #creating fire overlay
+                fire_version = zombie_sprite.copy()
+                fire_overlay = pygame.Surface(fire_version.get_size(), pygame.SRCALPHA)
+                fire_overlay.fill((255, 165, 0)) 
+                fire_version.blit(fire_overlay, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+                zombie_sprite = fire_version
+            else:
+                pass
+
+            if zombie.shocked:
+                shocked_version = zombie_sprite.copy()
+                shocked_overlay = pygame.Surface(shocked_version.get_size(), pygame.SRCALPHA)
+                shocked_overlay.fill((0, 0, 139)) 
+                shocked_version.blit(shocked_overlay, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+                zombie_sprite = shocked_version
+            else:
+                pass
             if zombie.animation_mode != 0:
                 canvas.blit(zombie_sprite, zombie.render_pos) 
             else:
                 canvas.blit(pygame.transform.flip(zombie_sprite, zombie.x_flip, False), (zombie.render_pos))
-    
+
 
     # *-- RENDER SHOP ORBS --*
     player_vec = pygame.math.Vector2(player.rect.center)
@@ -1997,8 +2117,10 @@ while True:
     elif brightness > 50:
         display_canvas.blit(brightness_surface, (0, 0), special_flags=pygame.BLEND_RGB_ADD)
 
+    fader.draw_fade(display_canvas)
 
     scaled_resolution = pygame.transform.scale(display_canvas, (screen_state_w, screen_state_h))
     screen.blit(scaled_resolution,(0,0))
+
     pygame.display.update()
     clock.tick(60)

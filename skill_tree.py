@@ -252,7 +252,7 @@ def load_font(path, size):
         return pygame.font.Font(None, int(size * 0.8))
 
 
-def load_spritesheet_icons(png_path="skilltree_spritesheet.png"):
+def load_spritesheet_icons(png_path="asset/skilltree_spritesheet.png"):
     """Loads icon surfaces using your teammate's Spritesheet class."""
     icons = {}
     try:
