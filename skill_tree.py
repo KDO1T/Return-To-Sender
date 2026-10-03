@@ -2,9 +2,7 @@ import pygame
 
 from spritesheet import Spritesheet
 
-# ==================================================
-# BACKEND DATA & CONSTANTS
-# ==================================================
+
 COL_BG = (15, 17, 23)
 COL_PANEL = (24, 28, 38)
 COL_PANEL_BORDER = (50, 58, 75)

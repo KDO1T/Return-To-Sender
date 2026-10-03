@@ -1436,9 +1436,9 @@ while True:
                 print(f"Zombie killed: {stage_dead_zombies} | +$3")
 
                 if getattr(zombie, "stage_final_zombie", False):
-                    # The final zombie of the stage always drops the shop orb.
-                
-                print(f"Zombie killed: {stage_dead_zombies}")
+                            # The final zombie of the stage always drops the shop orb.
+                            pass
+                            print(f"Zombie killed: {stage_dead_zombies}")
 
                 if player.blood_siphon:
                     siphoned_blood = (0.04*player.max_HP)

@@ -13,7 +13,7 @@ KEYRING_SERVICE = "Return To Sender"
 KEYRING_USERNAME = "save_encryption_key"
 
 
-USE_ENCRYPTION = False
+USE_ENCRYPTION = True
 
 # Values used when a save file does not contain a stat yet (brand new saves / old saves).
 DEFAULT_CRIT_DMG = 1.5
