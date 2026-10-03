@@ -115,10 +115,9 @@ canvas = pygame.Surface((base_res_x, base_res_y))
 screen = pygame.display.set_mode((screen_state_w, screen_state_h), status)
 
 brightness_surface = create_brightness_surface(brightness)
-fader = StageFade(canvas)
+
 
 clock = pygame.time.Clock() 
-
 
 # Fonts
 font_pause_title = pygame.font.Font("fonts/Press_Start_2P/PressStart2P.ttf", 24)
@@ -415,8 +414,6 @@ def load_stage(stage_number, saved_seed=None, saved_spritesheet=None, reset_play
     shop_timer = 0.0
     shop_accessed = False
     shop_message = ""
-    fader.reset_fade()
-    
 
     world.last_obstacle_col = -999
 
@@ -615,8 +612,6 @@ while True:
     dt = clock.get_time() / 1000.0
     player.jump = False
 
-    fader.update_fade()
-
     # *--INPUT DETECTION--*
     for event in pygame.event.get():
 
@@ -635,7 +630,6 @@ while True:
             shop_slots = len(current_shop_perks)
             start_x = (base_res_x - (shop_slots * card_w + (shop_slots - 1) * 30)) // 2
             card_y = 85
-
 
             for i in range(shop_slots):
                 card_x = start_x + i * (card_w + 30)
@@ -2069,10 +2063,7 @@ while True:
     elif brightness > 50:
         display_canvas.blit(brightness_surface, (0, 0), special_flags=pygame.BLEND_RGB_ADD)
 
-    fader.draw_fade(display_canvas)
-
     scaled_resolution = pygame.transform.scale(display_canvas, (screen_state_w, screen_state_h))
     screen.blit(scaled_resolution,(0,0))
-
     pygame.display.update()
     clock.tick(60)
