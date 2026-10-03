@@ -36,6 +36,7 @@ class World_Generation:
         base_height = 7
         amplitude = 10
 
+
         for y in range(-1,self.chunk_tiles_y):
             row = []
             world_tile_y = chunk_y*self.chunk_tiles_y + y
@@ -106,6 +107,35 @@ class World_Generation:
 
                                 if tile_above == '-1':
                                     grid[y][x] = '1'
+        #platform generation
+
+        if random.random() < 0.33:    
+            platform_length = 3 
+            placed = False
+
+            start_x = random.randint(0, self.chunk_tiles_x - platform_length)
+
+            surface_row = None
+            for y in range(1,len(grid)):
+                if grid[y][start_x] != '-1' and grid[y-1][start_x] == '-1':
+                    surface_row = y
+                    break
+
+            if surface_row is not None and surface_row >= 8:
+                platform_y = surface_row - random.randint(3,4)
+
+                can_place = True
+                for platformx in range(start_x, start_x + platform_length):
+                    if grid[platform_y][platformx] != '-1' or grid[platform_y +1][platformx] != '-1':
+                        can_place = False
+                        break
+
+                if can_place:
+                    for platformx in range(start_x, start_x + platform_length):
+                        grid[platform_y][platformx] = '1'
+                        grid[platform_y + 1][platformx] = '-1'
+                        placed = True
+            
         return grid
 
     def generate_chunk_obstacles(self, chunk_x, chunk_y, tile_grid, last_global_col):
@@ -212,4 +242,33 @@ class ParallaxBackground:
             elif draw_x > 0:
                 surface.blit(img, (draw_x - width,0))
 
+class StageFade:
+    def __init__(self, display_surface):
+        self.display = display_surface
+        self.fade_surface = pygame.Surface(self.display.get_size()).convert()
+        self.fade_surface.fill((0,0,0))
+        self.fade_alpha = 255
+        self.fade_speed = 5
+        self.is_fading_in = True
+
+    def reset_fade(self, display_surface = None):       #reset the fade values
+        if display_surface:
+            self.display = display_surface
         
+        self.fade_alpha = 255
+        self.is_fading_in = True
+
+    def update_fade(self):
+        if self.is_fading_in:
+            self.fade_alpha = max(0, self.fade_alpha - self.fade_speed) 
+            if self.fade_alpha == 0:
+                self.is_fading_in = False
+
+    def draw_fade(self, surface = None):
+        if surface is not None:
+            target = surface
+        else:
+            target = self.display
+        if self.fade_alpha > 0:
+            self.fade_surface.set_alpha(int(self.fade_alpha))
+            target.blit(self.fade_surface, (0,0))
