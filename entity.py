@@ -12,7 +12,7 @@ class Player:
                      holding_attack,attack_count,combo_stage, hit_landed, combo_buffer, zombies_hit, active_perks,
                     CRIT_DMG, CRIT_CHANCE, LEVEL, EXP, DOLLARS, S_COIN, 
                     ignition_edge, conductive_blade, heavy_cleave,phantom_step, executioner_stance, 
-                    blood_siphon, ironclad_guard, retaliatory_pulse, final_arsenal  ):
+                    blood_siphon, ironclad_guard, retaliatory_pulse, final_arsenal, dash_speed_count, increase_move_speed ):
         self.Name = Name
         self.rect = rect
         self.attack_rect = attack_rect #contains hitbox for each attack
@@ -76,6 +76,8 @@ class Player:
         self.EXP = EXP 
         self.DOLLARS = DOLLARS
         self.S_COIN = S_COIN
+        self.dash_speed_count = dash_speed_count
+        self.increase_move_speed = increase_move_speed
         # PERKS
         self.ignition_edge = ignition_edge
         self.conductive_blade = conductive_blade
@@ -251,6 +253,10 @@ class Player:
     def init_dash(self):
 
         if self.dash == True: #when you press the button
+            if self.phantom_step:
+                self.increase_move_speed = True
+                self.dash_speed_count = 150
+        
             if self.dash_charges > 0 and not self.dashing: #if you have a charge and you aren't currenly dashing
                 self.dashing = True
                 self.dash_charges -= 1
@@ -260,6 +266,14 @@ class Player:
         
 
     def check_cooldown(self):
+
+        #phantom step
+
+        if self.increase_move_speed == True:
+            self.dash_speed_count -= 1
+            if self.dash_speed_count <= 0:
+                self.increase_move_speed = False
+
 
 
         #iframes
@@ -530,9 +544,9 @@ class Player:
     def check_perks(self):
         perk_names = {perk["name"] for perk in self.active_perks}
         self.ignition_edge = "Ignition Edge" in perk_names
-        # self.conductive_blade = "Conductive Blade" in perk_names
-        # self.heavy_cleave = "Heavy Cleave" in perk_names
-        self.phantom_step = "Phantom Step" in perk_names
+        self.conductive_blade = "Conductive Blade" in perk_names
+        self.heavy_cleave = "Heavy Cleave" in perk_names
+        # self.phantom_step = "Phantom Step" in perk_names
         self.executioner_stance = "Executioner" in perk_names
         self.blood_siphon = "Blood Siphon" in perk_names
         self.ironclad_guard = "Ironclad Guard" in perk_names

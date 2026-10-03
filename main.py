@@ -242,6 +242,8 @@ player = Player(
     ironclad_guard=False,
     retaliatory_pulse=False,
     final_arsenal=False,
+    dash_speed_count = 150,
+    increase_move_speed = False,
 )
 
 player_rect = player.rect
@@ -1252,8 +1254,7 @@ while True:
     # ---------------------------------PERKS------------------------------------------------------------------
     
         player.check_perks()
-        player.heavy_cleave = True
-        player.conductive_blade = True
+        player.phantom_step = True
 
 
    # *---------------------------------------------------------------------------
@@ -1289,23 +1290,29 @@ while True:
         else:
 
             #left and right movement   
+
+            if player.increase_move_speed:
+                x_speed_increase = 2
+            else:
+                x_speed_increase = 0
+
             if player.attacking is True: #slow down movement if the player is attacking
                 if player.moving_right == True:
                     player.movement[0]= 1
-                    player.rect.x += player.movement[0]
+                    player.rect.x += player.movement[0] + x_speed_increase
 
                 if player.moving_left == True:
                     player.movement[0]= -1
-                    player.rect.x += player.movement[0] 
+                    player.rect.x += player.movement[0] - x_speed_increase
                     player.rect.x -= (player.hit_number % 3)*2
 
             else:
                 if player.moving_right == True:
                     player.movement[0]= 4
-                    player.rect.x += player.movement[0]
+                    player.rect.x += player.movement[0] + x_speed_increase
 
                 if player.moving_left == True:
-                    player.movement[0]= -4
+                    player.movement[0]= -4 - x_speed_increase
                     player.rect.x += player.movement[0]
 
 
@@ -1894,23 +1901,26 @@ while True:
     player.current_frames = player.update_action() #determines the current type of animation playing only if the animation mode changes
     player.update_player_frame() #update frame played and returns the animation mode
     player_sprite = player.current_frames[player.frame_index] #determines the image/sprite which will be displayed on player pos
-    canvas.blit(player_sprite, player_render_pos) 
-
+    canvas.blit(player_sprite, player_render_pos)
+    if player.shock_rect is not None:
+        shock_hitbox = pygame.Surface((player.shock_rect.width,player.shock_rect.height), pygame.SRCALPHA)
+        shock_hitbox.fill((173, 216, 230, 128))
+        canvas.blit(shock_hitbox, (player.shock_rect.x - camera_x - x_camera_delay - screen_shake_x, player.shock_rect.y - camera_y - y_camera_delay - screen_shake_y))
 
     # pygame.draw.rect(canvas, (255,0,0), player.attack_rect)
    
-    for zombie in zombies:
-        pygame.draw.rect(canvas, (0,255, 255), (zombie.rect.x - camera_x - x_camera_delay, zombie.rect.y - camera_y -y_camera_delay, zombie.rect.width, zombie.rect.height))
-    for zombie in zombies:
-        pygame.draw.rect(canvas, (0,0, 255), (zombie.head_rect.x - camera_x - x_camera_delay, zombie.head_rect.y - camera_y -y_camera_delay, zombie.head_rect.width, zombie.head_rect.height))
+    # for zombie in zombies:
+    #     pygame.draw.rect(canvas, (0,255, 255), (zombie.rect.x - camera_x - x_camera_delay, zombie.rect.y - camera_y -y_camera_delay, zombie.rect.width, zombie.rect.height))
+    # for zombie in zombies:
+    #     pygame.draw.rect(canvas, (0,0, 255), (zombie.head_rect.x - camera_x - x_camera_delay, zombie.head_rect.y - camera_y -y_camera_delay, zombie.head_rect.width, zombie.head_rect.height))
     
 
-    if player.attack_rect is not None:
-        pygame.draw.rect(canvas, (255, 0, 0), (player.attack_rect.x - camera_x - x_camera_delay, player.attack_rect.y - camera_y -y_camera_delay, player.attack_rect.width, player.attack_rect.height), 2)
-    if player.critical_rect is not None:   
-        pygame.draw.rect(canvas, (0, 255, 0), (player.critical_rect.x - camera_x - x_camera_delay, player.critical_rect.y - camera_y -y_camera_delay, player.critical_rect.width, player.critical_rect.height), 2)
-    if player.shock_rect is not None:
-        pygame.draw.rect(canvas, (0, 0, 255), (player.shock_rect.x - camera_x - x_camera_delay, player.shock_rect.y - camera_y -y_camera_delay, player.shock_rect.width, player.shock_rect.height), 2)
+    # if player.attack_rect is not None:
+    #     pygame.draw.rect(canvas, (255, 0, 0), (player.attack_rect.x - camera_x - x_camera_delay, player.attack_rect.y - camera_y -y_camera_delay, player.attack_rect.width, player.attack_rect.height), 2)
+    # if player.critical_rect is not None:   
+    #     pygame.draw.rect(canvas, (0, 255, 0), (player.critical_rect.x - camera_x - x_camera_delay, player.critical_rect.y - camera_y -y_camera_delay, player.critical_rect.width, player.critical_rect.height), 2)
+    # # if player.shock_rect is not None:
+    #     pygame.draw.rect(canvas, (0, 0, 255), (player.shock_rect.x - camera_x - x_camera_delay, player.shock_rect.y - camera_y -y_camera_delay, player.shock_rect.width, player.shock_rect.height), 2)
         
         
     #new player render code:
