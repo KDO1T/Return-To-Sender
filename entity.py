@@ -488,9 +488,6 @@ class Player:
                     if random.random() < crit_chance:
                         player_damage *= crit_damage
 
-
-
-
                     zombie.damaged = True
                     self.hit_landed = True
                     zombie.receive_damage(player_damage)
@@ -500,6 +497,7 @@ class Player:
 
 
                     self.zombies_hit.append(zombie)
+                    self.hit_number += 1
                     freeze_frame_counter = 2
 
                     heavy_knockback = self.heavy_cleave

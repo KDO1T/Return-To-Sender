@@ -7,15 +7,16 @@ DEFAULT_SETTINGS = {
     "resolution_index": 1,
     "fullscreen": False,
     "brightness": 50,
-    "master_volume": 100,
-    "music_volume": 80,
-    "sfx_volume": 100,
     "controls": {
         "up": "W",
         "left": "A",
         "down": "S",
         "right": "D",
-        "jump": "Space"
+        "jump": "Space",
+        "dash": "Left Ctrl",
+        "attack": "Mouse Left",
+        "interact": "E",
+        "skill_tree": "K"
     }
 }
 

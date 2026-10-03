@@ -2,9 +2,7 @@ import pygame
 
 from spritesheet import Spritesheet
 
-# ==================================================
-# BACKEND DATA & CONSTANTS
-# ==================================================
+
 COL_BG = (15, 17, 23)
 COL_PANEL = (24, 28, 38)
 COL_PANEL_BORDER = (50, 58, 75)
@@ -46,12 +44,6 @@ SKILLS = {
         "desc": "Critical hits deal +50% bonus damage.",
         "effects": {"crit_damage": 0.50},
     },
-    "attack_speed": {
-        "name": "Attack Speed", "branch": "COMBAT", "cost": 15, "pos": (268, 80),
-        "parent": "attack_damage", "requires_ranged": False,
-        "desc": "Attack 15% faster between hits.",
-        "effects": {"attack_speed_pct": 0.15},
-    },
     # ---------------- SURVIVAL ----------------
     "max_health": {
         "name": "Maximum Health", "branch": "SURVIVAL", "cost": 5, "pos": (268, 195),
@@ -64,12 +56,6 @@ SKILLS = {
         "parent": "max_health", "requires_ranged": False,
         "desc": "Take 15% less damage from hits.",
         "effects": {"damage_reduction": 0.15},
-    },
-    "knockback_resistance": {
-        "name": "Knockback Resistance", "branch": "SURVIVAL", "cost": 20, "pos": (158, 195),
-        "parent": "damage_reduction", "requires_ranged": False,
-        "desc": "Reduces the knockback you take by 50%.",
-        "effects": {"knockback_resist": 0.50},
     },
     # ---------------- MOVEMENT ----------------
     "movement_speed": {
@@ -98,12 +84,6 @@ SKILLS = {
         "desc": "+15% damage with the blade.",
         "effects": {"damage_pct": 0.15},
     },
-    "blade_attack_speed": {
-        "name": "Blade Attack Speed", "branch": "WEAPONS", "cost": 16, "pos": (427, 125),
-        "parent": "blade_damage", "requires_ranged": False,
-        "desc": "Blade swings 15% faster.",
-        "effects": {"attack_speed_pct": 0.15},
-    },
     "ranged_damage": {
         "name": "Ranged Damage", "branch": "WEAPONS", "cost": 25, "pos": (372, 80),
         "parent": "blade_damage", "requires_ranged": True,
@@ -119,12 +99,11 @@ SKILLS = {
 }
 
 EFFECT_KEYS = (
-    "damage_pct", "crit_chance", "crit_damage", "attack_speed_pct", "max_hp",
-    "damage_reduction", "knockback_resist", "move_speed_bonus", "shop_slots",
+    "damage_pct", "crit_chance", "crit_damage", "max_hp",
+    "damage_reduction", "move_speed_bonus", "shop_slots",
     "purchase_limit", "ranged_damage_pct", "ranged_capacity",
 )
 
-MIN_COMBO_COOLDOWN = 6
 
 
 # ==================================================
@@ -237,18 +216,20 @@ def apply_skill_effects(player, tree, heal_on_gain=True):
     player.crit_chance_bonus = fx["crit_chance"]
     player.crit_dmg_bonus = fx["crit_damage"]
 
-    # base_cd = getattr(player, "base_combo_cooldown", player.combo_cooldown)
-    # player.combo_cooldown = max(MIN_COMBO_COOLDOWN, round(base_cd / (1.0 + fx["attack_speed_pct"])))
 
     # Survival stats
     player.damage_reduction = min(0.9, fx["damage_reduction"])
-    player.knockback_resist = min(1.0, fx["knockback_resist"])
 
     # Movement speed
     player.move_speed = getattr(player, "base_move_speed", 4) + int(fx["move_speed_bonus"])
 
     player.skill_effects = fx
 
+    # Economy
+    player.shop_slots = int(fx["shop_slots"])
+    player.purchase_limit = int(fx["purchase_limit"])
+
+    player.skill_effects = fx
 
 # ==================== FRONTEND ====================
 
@@ -278,15 +259,12 @@ def load_spritesheet_icons(png_path="asset/skilltree_spritesheet.png"):
             "attack_damage": "01_sword.png",
             "crit_chance": "02_crosshair.png",
             "crit_damage": "03_blazing_star.png",
-            "attack_speed": "08_dagger_speed.png",
             "max_health": "11_heart.png",
             "damage_reduction": "12_shield.png",
-            "knockback_resistance": "13_arrow_wall.png",
             "movement_speed": "04_double_chevron.png",
             "shop_expansion": "14_shop.png",
             "purchase_limit": "15_shop_plus.png",
             "blade_damage": "05_dagger.png",
-            "blade_attack_speed": "08_dagger_speed.png",
             "ranged_damage": "06_bullet.png",
             "ranged_capacity": "07_triple_bullet.png",
         }

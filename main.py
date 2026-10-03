@@ -6,6 +6,7 @@ import pygame
 from perlin_noise import PerlinNoise
 from pygame.locals import *
 
+import hud
 from entity import Orb, Player, Zombie, zombies
 from save_system import load_game, save_game
 from settings_system import load_settings, save_settings
@@ -82,9 +83,6 @@ selected_resolution = max(0, min(len(resolution_options) - 1, settings["resoluti
 window_w, window_h = resolution_options[selected_resolution]
 fullscreen = settings["fullscreen"]
 brightness = settings["brightness"]
-master_volume = settings["master_volume"]
-music_volume = settings["music_volume"]
-sfx_volume = settings["sfx_volume"]
 controls = settings.get("controls", {})
 
 if fullscreen:
@@ -99,8 +97,17 @@ control_keys = {
     "left": pygame.key.key_code(controls.get("left", "A").lower()),
     "down": pygame.key.key_code(controls.get("down", "S").lower()),
     "right": pygame.key.key_code(controls.get("right", "D").lower()),
-    "jump": pygame.key.key_code(controls.get("jump", "Space").lower())
+    "jump": pygame.key.key_code(controls.get("jump", "Space").lower()),
+    "dash": pygame.key.key_code(controls.get("dash", "Left Ctrl").lower()),
+    "interact": pygame.key.key_code(controls.get("interact", "E").lower()),
+    "skill_tree": pygame.key.key_code(controls.get("skill_tree", "K").lower())
 }
+attack_mouse_button_names = {
+    "Mouse Left": 1,
+    "Mouse Middle": 2,
+    "Mouse Right": 3,
+}
+attack_mouse_button = attack_mouse_button_names.get(controls.get("attack", "Mouse Left"), 1)
 
 #camera movement
 camera_x=0 
@@ -125,9 +132,13 @@ font_pause = pygame.font.Font("fonts/VT323/VT323.ttf", 34)
 font_pause_small = pygame.font.Font("fonts/VT323/VT323.ttf", 26)
 font_perk_title = pygame.font.Font("fonts/VT323/VT323.ttf", 18)
 font_perk_desc = pygame.font.Font("fonts/VT323/VT323.ttf", 14)  
+hud_font_main = pygame.font.Font("fonts/VT323/VT323.ttf", 24) 
+hud_font_small = pygame.font.Font("fonts/VT323/VT323.ttf", 16)
+
+dash_icon = pygame.image.load("dash_icon.png").convert_alpha()
 
 
-# *------------------------------------------------------------------- PERKS DATA -----------------------------------------------------------------------------------------*
+# *------------------------------------------------------------------- PERKS -----------------------------------------------------------------------------------------*
 PERKS = [
     {"name": "Ignition Edge", "desc": "Melee hits have a 30% chance to set zombies on fire, dealing 15 burn damage over 3 seconds.", "rarity": "Budget", "weight": 26, "cost": 15},
     {"name": "Conductive Blade", "desc": "Every 3rd melee swing releases a shockwave that arcs lightning to 2 nearby zombies for 50% damage.", "rarity": "Budget", "weight": 26, "cost": 15},
@@ -396,11 +407,13 @@ shop_msg_timer = 0
 current_shop_perks = []
 purchases_allowed = 1
 current_purchases = 0
+stage_map_random_states = {}
+stage_map_configs = {}
 
 spritesheet_pool = ['asset/grass_spritesheet.png','asset/cartoon_spritesheet.png','asset/plague_spritesheet.png','asset/exclusion_spritesheet.png']
 
 def load_stage(stage_number, saved_seed=None, saved_spritesheet=None, reset_player=True):
-    global current_stage, min_world_chunks, max_world_chunks, loaded_chunks, world, player_rect, current_spritesheet, spritesheet_pool, current_map_seed, spawned_chunks, stage_spawned_zombies, stage_dead_zombies, shop_active, shop_accessed, shop_timer, orbs, shop_message, bg 
+    global current_stage, min_world_chunks, max_world_chunks, loaded_chunks, world, player_rect, current_spritesheet, spritesheet_pool, current_map_seed, spawned_chunks, stage_spawned_zombies, stage_dead_zombies, shop_active, shop_accessed, shop_timer, orbs, shop_message, bg, stage_map_random_states, stage_map_configs 
 
     current_stage = stage_number
     loaded_chunks.clear()
@@ -455,6 +468,14 @@ def load_stage(stage_number, saved_seed=None, saved_spritesheet=None, reset_play
 
 
     current_map_seed = new_seed
+    stage_map_configs[stage_number] = (new_seed, current_spritesheet.spritesheet)
+
+    # Keep the exact random state used when this stage map starts generating.
+    # On a retry, restoring it makes random-based map elements generate identically.
+    if saved_seed is not None and saved_spritesheet is not None and stage_number in stage_map_random_states:
+        random.setstate(stage_map_random_states[stage_number])
+    else:
+        stage_map_random_states[stage_number] = random.getstate()
 
     #*--------------------------------------------------------------PARALLAX----------------------------------------------------------------------*
     if current_spritesheet is not None:
@@ -562,19 +583,9 @@ def update_settings_file():
         "resolution_index": selected_resolution,
         "fullscreen": fullscreen,
         "brightness": brightness,
-        "master_volume": master_volume,
-        "music_volume": music_volume,
-        "sfx_volume": sfx_volume,
         "controls": controls
     })
 
-
-def apply_audio_settings():
-    if pygame.mixer.get_init():
-        pygame.mixer.music.set_volume((master_volume / 100) * (music_volume / 100))
-
-
-apply_audio_settings()
 
 
 def save_current_game():
@@ -652,12 +663,20 @@ while True:
                                 shop_timer = 0.0
                     break
 
-        if event.type == pygame.KEYDOWN and pause_rebinding_control is not None and paused and pause_state == "OPTIONS" and pause_options_state == "CONTROLS":
-            controls[pause_rebinding_control] = pygame.key.name(event.key).title()
-            control_keys[pause_rebinding_control] = event.key
-            pause_rebinding_control = None
-            update_settings_file()
-            continue
+        if pause_rebinding_control is not None and paused and pause_state == "OPTIONS" and pause_options_state == "CONTROLS":
+            if event.type == pygame.MOUSEBUTTONDOWN and pause_rebinding_control == "attack":
+                if event.button in (1, 2, 3):
+                    attack_mouse_button = event.button
+                    controls["attack"] = {1: "Mouse Left", 2: "Mouse Middle", 3: "Mouse Right"}[event.button]
+                    pause_rebinding_control = None
+                    update_settings_file()
+                continue
+            if event.type == pygame.KEYDOWN and pause_rebinding_control != "attack":
+                controls[pause_rebinding_control] = pygame.key.name(event.key).title()
+                control_keys[pause_rebinding_control] = event.key
+                pause_rebinding_control = None
+                update_settings_file()
+                continue
 
         # ESC opens/closes pause menu or shop
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -675,7 +694,7 @@ while True:
             continue
 
         # Interacting with Shop Orbs or toggling shop UI via 'E' key
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_e and not paused:
+        if event.type == pygame.KEYDOWN and event.key == control_keys["interact"] and not paused:
             if shop_active:
                 shop_active = False
             else:
@@ -718,7 +737,7 @@ while True:
             save_current_game()
 
         # K opens skill tree
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_k and not paused and not shop_active:
+        if event.type == pygame.KEYDOWN and event.key == control_keys["skill_tree"] and not paused and not shop_active:
             paused = True
             pause_state = "SKILLS"
             skills_opened_with_hotkey = True
@@ -774,15 +793,12 @@ while True:
                     if pause_options_state == "MAIN":
                         option_cards = [
                             pygame.Rect(100, 95, 440, 40),
-                            pygame.Rect(100, 150, 440, 40),
-                            pygame.Rect(100, 205, 440, 40)
+                            pygame.Rect(100, 150, 440, 40)
                         ]
 
                         if option_cards[0].collidepoint(mouse_x, mouse_y):
-                            pause_options_state = "AUDIO"
-                        elif option_cards[1].collidepoint(mouse_x, mouse_y):
                             pause_options_state = "VIDEO"
-                        elif option_cards[2].collidepoint(mouse_x, mouse_y):
+                        elif option_cards[1].collidepoint(mouse_x, mouse_y):
                             pause_options_state = "CONTROLS"
                         elif pygame.Rect(0, 310, base_res_x, 40).collidepoint(mouse_x, mouse_y):
                             pause_state = "PAUSE"
@@ -830,36 +846,21 @@ while True:
                             brightness_surface = create_brightness_surface(brightness)
                             update_settings_file()
 
-                    elif pause_options_state == "AUDIO":
-                        if pygame.Rect(0, 310, base_res_x, 40).collidepoint(mouse_x, mouse_y):
-                            pause_options_state = "MAIN"
-                            pause_dragging_slider = None
-
-                        audio_sliders = [("master", 130), ("music", 178), ("sfx", 226)]
-                        for slider_name, slider_y in audio_sliders:
-                            slider_rect = pygame.Rect(330, slider_y - 9, 190, 18)
-                            if slider_rect.collidepoint(mouse_x, mouse_y):
-                                pause_dragging_slider = slider_name
-                                value = max(0, min(100, int((mouse_x - 330) / 190 * 100)))
-                                if slider_name == "master":
-                                    master_volume = value
-                                elif slider_name == "music":
-                                    music_volume = value
-                                else:
-                                    sfx_volume = value
-                                break
-
                     elif pause_options_state == "CONTROLS":
                         if pygame.Rect(0, 310, base_res_x, 40).collidepoint(mouse_x, mouse_y):
                             pause_options_state = "MAIN"
                             pause_rebinding_control = None
 
                         control_rows = [
-                            ("up", 105),
-                            ("left", 137),
-                            ("down", 169),
-                            ("right", 201),
-                            ("jump", 233)
+                            ("up", 92),
+                            ("left", 116),
+                            ("down", 140),
+                            ("right", 164),
+                            ("jump", 188),
+                            ("dash", 212),
+                            ("attack", 236),
+                            ("interact", 260),
+                            ("skill_tree", 284)
                         ]
 
                         for control_name, row_y in control_rows:
@@ -876,16 +877,6 @@ while True:
                     brightness = max(0, min(100, int((mouse_x - 270) / 220 * 100)))
                     brightness_surface = create_brightness_surface(brightness)
                     update_settings_file()
-                elif pause_dragging_slider in ("master", "music", "sfx") and pause_options_state == "AUDIO":
-                    value = max(0, min(100, int((mouse_x - 330) / 190 * 100)))
-                    if pause_dragging_slider == "master":
-                        master_volume = value
-                    elif pause_dragging_slider == "music":
-                        music_volume = value
-                    else:
-                        sfx_volume = value
-                    apply_audio_settings()
-                    update_settings_file()
 
             if event.type == pygame.KEYDOWN and event.key == pygame.K_F5:
                 save_current_game()
@@ -899,9 +890,9 @@ while True:
 
         
         if not shop_active:
-            if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == attack_mouse_button:
                 player.holding_attack = True
-            if event.type == pygame.MOUSEBUTTONUP:
+            if event.type == pygame.MOUSEBUTTONUP and event.button == attack_mouse_button:
                 player.holding_attack = False
 
 
@@ -957,7 +948,7 @@ while True:
                 player.press_space = True
 
 
-            if event.key == pygame.K_LCTRL:
+            if event.key == control_keys["dash"]:
                 player.dash = True
             
 
@@ -1029,7 +1020,7 @@ while True:
                 options_title = font_pause_title.render("OPTIONS", False, (240, 240, 240))
                 display_canvas.blit(options_title, options_title.get_rect(center=(base_res_x / 2, 65)))
 
-                option_cards = ["Audio Settings", "Video Settings", "Controls"]
+                option_cards = ["Video Settings", "Controls"]
                 for index, option in enumerate(option_cards):
                     card_rect = pygame.Rect(100, 95 + index * 55, 440, 40)
                     pygame.draw.rect(display_canvas, (25, 25, 30), card_rect, 2)
@@ -1070,34 +1061,23 @@ while True:
                         option_text = font_pause_small.render(f"{option[0]}x{option[1]}", False, (240, 240, 240))
                         display_canvas.blit(option_text, option_text.get_rect(midleft=(dropdown_rect.left + 12, 160 + index * 30)))
 
-            elif pause_options_state == "AUDIO":
-                title = font_pause_title.render("AUDIO", False, (240, 240, 240))
-                display_canvas.blit(title, title.get_rect(center=(base_res_x / 2, 65)))
-                audio_settings = [("Master Volume", master_volume), ("Music Volume", music_volume), ("SFX Volume", sfx_volume)]
-                for index, (label, value) in enumerate(audio_settings):
-                    row_y = 120 + index * 48
-                    label_text = font_pause.render(label, False, (240, 240, 240))
-                    display_canvas.blit(label_text, label_text.get_rect(midleft=(105, row_y)))
-                    slider_x, slider_y, slider_width = 330, row_y - 7, 190
-                    pygame.draw.rect(display_canvas, (60, 60, 70), (slider_x, slider_y, slider_width, 14), 2)
-                    handle_x = slider_x + (value / 100 * slider_width)
-                    pygame.draw.rect(display_canvas, (235, 65, 40), (handle_x - 4, slider_y - 5, 8, 24))
-                    value_text = font_pause_small.render(f"{value}%", False, (140, 140, 140))
-                    display_canvas.blit(value_text, value_text.get_rect(midleft=(532, row_y)))
-
             elif pause_options_state == "CONTROLS":
                 title = font_pause_title.render("CONTROLS", False, (240, 240, 240))
                 display_canvas.blit(title, title.get_rect(center=(base_res_x / 2, 65)))
                 control_rows = [
-                    ("Move Up", controls.get("up", "W")),
+                    ("Aim Up", controls.get("up", "W")),
                     ("Move Left", controls.get("left", "A")),
-                    ("Move Down", controls.get("down", "S")),
+                    ("Aim Down", controls.get("down", "S")),
                     ("Move Right", controls.get("right", "D")),
-                    ("Jump", controls.get("jump", "Space"))
+                    ("Jump", controls.get("jump", "Space")),
+                    ("Dash", controls.get("dash", "Left Ctrl")),
+                    ("Attack", controls.get("attack", "Mouse Left")),
+                    ("Interact / Shop", controls.get("interact", "E")),
+                    ("Skill Tree", controls.get("skill_tree", "K"))
                 ]
                 for index, (action, key) in enumerate(control_rows):
-                    row_y = 105 + index * 32
-                    control_name = ["up", "left", "down", "right", "jump"][index]
+                    row_y = 92 + index * 24
+                    control_name = ["up", "left", "down", "right", "jump", "dash", "attack", "interact", "skill_tree"][index]
                     if pause_rebinding_control == control_name:
                         key = "Press a key..."
                     action_text = font_pause.render(action, False, (240, 240, 240))
@@ -1153,7 +1133,10 @@ while True:
     despawn_distance = 4 * chunk_pixel_w
     for zombie in zombies[:] :
         if abs(zombie.rect.centerx - player.rect.centerx) > despawn_distance:
-            zombies.remove(zombie)
+            # Keep the final stage zombie available so it can always be killed
+            # and guarantee the stage's shop orb.
+            if not getattr(zombie, "stage_final_zombie", False):
+                zombies.remove(zombie)
 
     if player.moving_right:
         target_chunk_x = position_chunk_x + 1
@@ -1187,6 +1170,7 @@ while True:
                     int(current_stage*2 + 5)
                 )
                 new_zombie.head_rect = new_zombie.generate_head_rect() #make head rect for critical hit
+                new_zombie.stage_final_zombie = (stage_spawned_zombies + 1 == stage_max_zombies)
                 zombies.append(new_zombie)
                 stage_spawned_zombies += 1
 
@@ -1342,6 +1326,8 @@ while True:
 
         #next stage
         if player.rect.right >= max_world_chunks:
+            player.DOLLARS = (player.DOLLARS or 0)
+            player.S_COIN = (player.S_COIN or 0) + 8
             load_stage(current_stage+1)
             
 
@@ -1439,8 +1425,14 @@ while True:
             if del_zomb is not None:
                 zombies.pop(del_zomb)
                 stage_dead_zombies += 1
-                
-                print(f"Zombie killed: {stage_dead_zombies}")
+                player.DOLLARS = (player.DOLLARS or 0) + 3
+
+                print(f"Zombie killed: {stage_dead_zombies} | +$3")
+
+                if getattr(zombie, "stage_final_zombie", False):
+                            # The final zombie of the stage always drops the shop orb.
+                            pass
+                            print(f"Zombie killed: {stage_dead_zombies}")
 
                 if player.blood_siphon:
                     siphoned_blood = (0.04*player.max_HP)
@@ -1462,6 +1454,13 @@ while True:
                         guaranteed=True,
                         chance=1.0
                     ))
+                elif 7 <= stage_dead_zombies < stage_max_zombies:
+                    if random.random() < 0.1:   # Orb drop chance
+                        orbs.append(Orb(
+                            pygame.Rect(zombie.rect.x, zombie.rect.y, 16, 16),
+                            guaranteed=False,
+                            chance=0.6   # Shop RNG
+                        ))
 
                 zomb_no += 1
 
@@ -1484,6 +1483,40 @@ while True:
         player.retaliatory_rect_collision(zombies)
 
         current_stage = player.dead_check(current_stage, stage_min_chunk_x, world.chunk_pixel_w)
+
+        if player.HP <= 0:
+            print("Player died - resetting run")
+
+            # Retry Stage 1 using the exact same map seed, spritesheet,
+            # and random generation state from the original run.
+            retry_map_seed, retry_map_spritesheet = stage_map_configs[1]
+
+            player.DOLLARS = 0
+            player.HP = player.max_HP
+            player.active_perks = []
+            player.y_momentum = 0
+            player.x_momentum = 0
+            player.dashing = False
+            player.dash = False
+            player.dash_buffer = 0
+            player.dash_counter = 0
+            player.damaged = False
+            player.invulnerable = False
+            player.attacking = False
+            player.holding_attack = False
+            player.hit_landed = False
+            player.attack_count = 0
+            player.combo_stage = 1
+            player.combo_buffer = 0
+            player.zombies_hit = []
+            shop_active = False
+            shop_timer = 0.0
+            shop_accessed = False
+            shop_message = ""
+            shop_msg_timer = 0
+            current_shop_perks = []
+            current_purchases = 0
+            load_stage(1, retry_map_seed, retry_map_spritesheet)
 
         
         
@@ -1993,6 +2026,21 @@ while True:
         msg_color = (100, 255, 100) if "Unlocked" in shop_message else (255, 90, 90)
         msg_surf = font_pause_small.render(shop_message, True, msg_color)
         canvas.blit(msg_surf, msg_surf.get_rect(center=(base_res_x / 2, 30)))
+
+    # HUD
+    hud.draw_hud(
+        surface=canvas, 
+        player=player, 
+        zombies=zombies, 
+        camera_x=camera_x, 
+        camera_y=camera_y, 
+        screen_w=base_res_x, 
+        screen_h=base_res_y, 
+        stage_kill_count=stage_dead_zombies, 
+        font=hud_font_main, 
+        font_small=hud_font_small,
+        dash_icon=dash_icon
+    )
 
     # *-- RENDER SHOP OVERLAY UI (LEAGUE OF LEGENDS AUGMENTS STYLE) --*
     if shop_active:
