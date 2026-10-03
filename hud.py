@@ -61,7 +61,10 @@ def draw_hud(surface, player, zombies, camera_x, camera_y, screen_w, screen_h, s
     zombie_hp_height = 5
 
     for zombie in zombies:
-        z_max_hp = getattr(zombie, 'max_HP', zombie.HP) 
+        if not hasattr(zombie, 'max_HP'):
+            zombie.max_HP = getattr(zombie, 'max_hp', getattr(zombie, 'max_health', zombie.HP))
+
+        z_max_hp = zombie.max_HP
         
         if z_max_hp > 0 and zombie.HP > 0:
             z_health_pct = zombie.HP / z_max_hp

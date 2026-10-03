@@ -583,16 +583,16 @@ class Player:
         return freeze_frames
 
     def check_perks(self):
-        pass
-        # perk_names = {perk["name"] for perk in self.active_perks}
-        # self.ignition_edge = "Ignition Edge" in perk_names
-        # self.conductive_blade = "Conductive Blade" in perk_names
-        # self.heavy_cleave = "Heavy Cleave" in perk_names
-        # self.phantom_step = "Phantom Step" in perk_names
-        # self.executioner_stance = "Executioner" in perk_names
-        # self.blood_siphon = "Blood Siphon" in perk_names
-        # self.retaliatory_pulse = "Retaliatory Pulse" in perk_names
-        # self.final_arsenal = "Final Arsenal" in perk_names
+
+        perk_names = {perk["name"] for perk in self.active_perks}
+        self.ignition_edge = "Ignition Edge" in perk_names
+        self.conductive_blade = "Conductive Blade" in perk_names
+        self.heavy_cleave = "Heavy Cleave" in perk_names
+        self.phantom_step = "Phantom Step" in perk_names
+        self.executioner_stance = "Executioner" in perk_names
+        self.blood_siphon = "Blood Siphon" in perk_names
+        self.retaliatory_pulse = "Retaliatory Pulse" in perk_names
+        self.final_arsenal = "Final Arsenal" in perk_names
 
     
 
