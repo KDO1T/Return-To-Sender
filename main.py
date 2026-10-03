@@ -6,7 +6,7 @@ import pygame
 from perlin_noise import PerlinNoise
 from pygame.locals import *
 
-from entity import Player, Zombie, zombies
+from entity import Orb, Player, Zombie, zombies
 from save_system import load_game, save_game
 from settings_system import load_settings, save_settings
 from skill_tree import SkillTreeState, SkillTreeUI, apply_skill_effects
@@ -40,6 +40,25 @@ def create_brightness_surface(value):
 
     return brightness_surface
 
+# Text Wrapper Helper
+def draw_text_wrapped(surface, text, color, rect, font, line_spacing=2):
+    words = text.split(' ')
+    lines = []
+    current_line = []
+    for word in words:
+        test_line = ' '.join(current_line + [word])
+        if font.size(test_line)[0] <= rect.width:
+            current_line.append(word)
+        else:
+            lines.append(' '.join(current_line))
+            current_line = [word]
+    lines.append(' '.join(current_line))
+    
+    y_offset = rect.y
+    for line in lines:
+        text_surf = font.render(line, True, color)
+        surface.blit(text_surf, (rect.x, y_offset))
+        y_offset += font.get_linesize() + line_spacing
 
 pygame.init()
 
@@ -84,14 +103,13 @@ control_keys = {
 }
 
 #camera movement
-camera_x=0 #made it the same as the player's coordinates
-camera_y=0 #made it the same as the player's coordinates
+camera_x=0 
+camera_y=0 
 x_camera_delay = 0
 y_camera_delay = 0
-camera_speed=5 #will make this the difference in current player coordinates 
+camera_speed=5  
 
 
-#1. initiliaze pygame, 2. names the window, 3. sets the window size and sets its paramaters
 pygame.display.set_caption("Return To Sender") 
 canvas = pygame.Surface((base_res_x, base_res_y))
 screen = pygame.display.set_mode((screen_state_w, screen_state_h), status)
@@ -99,22 +117,35 @@ screen = pygame.display.set_mode((screen_state_w, screen_state_h), status)
 brightness_surface = create_brightness_surface(brightness)
 
 
-clock = pygame.time.Clock() #assigning the clock function to a variable to use for the fps in the gameloop
+clock = pygame.time.Clock() 
 
-
+# Fonts
 font_pause_title = pygame.font.Font("fonts/Press_Start_2P/PressStart2P.ttf", 24)
 font_pause = pygame.font.Font("fonts/VT323/VT323.ttf", 34)
 font_pause_small = pygame.font.Font("fonts/VT323/VT323.ttf", 26)
+font_perk_title = pygame.font.Font("fonts/VT323/VT323.ttf", 18)
+font_perk_desc = pygame.font.Font("fonts/VT323/VT323.ttf", 14)
+
+
+# *------------------------------------------------------------------- PERKS DATA -----------------------------------------------------------------------------------------*
+PERKS = [
+    {"name": "Ignition Edge", "desc": "Melee hits have a 30% chance to set zombies on fire, dealing 15 burn damage over 3 seconds.", "rarity": "Budget", "weight": 26, "cost": 15},
+    {"name": "Conductive Blade", "desc": "Every 3rd melee swing releases a shockwave that arcs lightning to 2 nearby zombies for 50% damage.", "rarity": "Budget", "weight": 26, "cost": 15},
+    {"name": "Heavy Cleave", "desc": "Increases your melee swing arc size by 35% and increases knockback force by 50%.", "rarity": "Mid", "weight": 8, "cost": 30},
+    {"name": "Phantom Step", "desc": "Dodging through a zombie renders you briefly invulnerable and grants +25% move speed for 2.5s.", "rarity": "Mid", "weight": 8, "cost": 30},
+    {"name": "Executioner", "desc": "+35% bonus damage against zombies that are burning, shocked, or below 30% HP.", "rarity": "Mid", "weight": 8, "cost": 30},
+    {"name": "Blood Siphon", "desc": "Melee kills restore 4% Max HP. Parrying or blocking an attack heals 6 HP.", "rarity": "High", "weight": 1, "cost": 60},
+    {"name": "Ironclad Guard", "desc": "Reduces incoming damage from behind by 40% and grants immunity.", "rarity": "High", "weight": 1, "cost": 60},
+    {"name": "Retaliatory Pulse", "desc": "Taking damage releases a kinetic shockwave that knocks back all surrounding zombies & stuns them.", "rarity": "High", "weight": 1, "cost": 60},
+    {"name": "Final Arsenal", "desc": "+15% raw melee damage. Converts into +35% Ranged Dmg & +50% Reload Speed when Gun is unlocked.", "rarity": "High", "weight": 1, "cost": 60}
+]
 
 # *------------------------------------------------------------------- MAP STUFF -----------------------------------------------------------------------------------------*
 current_spritesheet = None
 current_map_seed = None
 zombie_count = 1
 
-# sprites = Spritesheet('spritesheet.png')
-
 tile_size = 32
-#16 tiles / chunk
 chunk_tiles_x = 16
 chunk_tiles_y = 16
 
@@ -323,43 +354,49 @@ player.all_frames.append(jimmy_sheet.parse_sprite(filename))
 #     filename = f'attack_{i}'
 #     player.all_frames.append(jimmy_sheet.parse_sprite(filename))
 
-# 0-5 idle, 6-10 walk, 11-14 jump, 15-17 fall, 18-20 attack
-# 0=idle, 1=walk, 2=jump, 3=fall
-
-
-
-
-#*---------------------------------------------------------------STAGES------------------------------------------------------------------------*
-#STAGE
+#*---------------------------------------------------------------STAGES & SHOP SYSTEM------------------------------------------------------------------------*
 current_stage = 1
 stage_length = 8
-#(-1)*(16tiles/1chunk) = minimum world_chunks
 min_world_chunks = 0
 max_world_chunks = 0
 loaded_chunks = {}
 spawned_chunks = set()
 stage_spawned_zombies = 0
-stage_max_zombies = 30
+stage_dead_zombies = 0
+stage_max_zombies = 20
+
+shop_active = False
+shop_timer = 0.0
+shop_accessed = False
+orbs = []
+shop_message = ""
+shop_msg_timer = 0
+current_shop_perks = []
+purchases_allowed = 1
+current_purchases = 0
 
 spritesheet_pool = ['grass_spritesheet.png','cartoon_spritesheet.png']
 
 def load_stage(stage_number, saved_seed=None, saved_spritesheet=None, reset_player=True):
-    global current_stage, min_world_chunks, max_world_chunks, loaded_chunks, world, player_rect, current_spritesheet, spritesheet_pool, current_map_seed, spawned_chunks, stage_spawned_zombie
+    global current_stage, min_world_chunks, max_world_chunks, loaded_chunks, world, player_rect, current_spritesheet, spritesheet_pool, current_map_seed, spawned_chunks, stage_spawned_zombies, stage_dead_zombies, shop_active, shop_accessed, shop_timer, orbs, shop_message
 
     current_stage = stage_number
-    loaded_chunks.clear() #resets chunks loaded
+    loaded_chunks.clear()
     spawned_chunks.clear()
     zombies.clear()
+    orbs.clear()
     stage_spawned_zombies = 0
+    stage_dead_zombies = 0
+    shop_active = False
+    shop_timer = 0.0
+    shop_accessed = False
+    shop_message = ""
 
     stage_min_chunk_x = ((stage_number-1)*stage_length) - 1
     stage_max_chunk_x = stage_min_chunk_x + stage_length
 
-    #(-1)*(16tiles/1chunk) = minimum world_chunks
     min_world_chunks = stage_min_chunk_x*world.chunk_pixel_w
     max_world_chunks = (stage_max_chunk_x+1)*world.chunk_pixel_w    
-
-    #STAGE UPDATES
 
     if saved_seed is not None and saved_spritesheet is not None:
         new_seed = saved_seed
@@ -380,42 +417,28 @@ def load_stage(stage_number, saved_seed=None, saved_spritesheet=None, reset_play
 
     current_map_seed = new_seed
 
-    print(
-    "GENERATING WORLD:",
-    "stage =", current_stage,
-    "seed =", current_map_seed,
-    "player =", (player.rect.x, player.rect.y)
-    )
-
-    #reinitialise perlin
-    #Surface_Level
     world.noise1d = PerlinNoise(octaves=2, seed = int(new_seed))
-    #Caves
     world.noise2d = PerlinNoise(octaves=3, seed = int(new_seed))
 
-    #reset player to new stage
     if reset_player:
         player.rect.x = (stage_min_chunk_x + 1)*world.chunk_pixel_w + 64
         player.rect.y = 100
 
 """------------------------------------------------------- In-Game Pause Menu ---------------------------------------------------------------"""
 
-# Pause menu state
 paused = False
 pause_state = "PAUSE"
 pause_options_state = "MAIN"
 pause_dragging_slider = None
 pause_dropdown_open = False
 pause_rebinding_control = None
-skills_opened_with_hotkey = False   # Sets itself to true when the skill tree is opened with K instead of the pause menu, to avoid error
+skills_opened_with_hotkey = False
 
-# Turn this off (or delete the F6 block in the event loop) once Soul Coins are earned in-game.
 DEBUG_SOUL_COINS = True
 
 brightness, saved_world = load_game(save_slot, player, player_rect, brightness)
 brightness_surface = create_brightness_surface(brightness)
 
-# Skill tree: purchased skills + ranged unlock live on the player, so they come from THIS save slot.
 skill_tree = SkillTreeState(player)
 apply_skill_effects(player, skill_tree, heal_on_gain=False)
 skill_ui = SkillTreeUI(skill_tree, base_res_x, base_res_y)
@@ -423,38 +446,14 @@ skill_ui = SkillTreeUI(skill_tree, base_res_x, base_res_y)
 def pause_button_rects():
     return [pygame.Rect(220, 100 + index * 42, 200, 38) for index in range(5)]
 
-
 def close_skill_tree():
     global pause_state, paused
     pause_state = "PAUSE"
     if skills_opened_with_hotkey:
         paused = False
 
-# Restore the saved world state before generating the current stage.
 saved_stage = saved_world.get("current_stage")
 saved_seed = saved_world.get("map_seed")
-
-print(
-    "LOADED WORLD:",
-    "stage =", current_stage,
-    "seed =", saved_seed,
-    "player =", (player.rect.x, player.rect.y)
-)
-saved_spritesheet = saved_world.get("spritesheet")
-saved_zombie_count = saved_world.get("zombie_count")
-if isinstance(saved_zombie_count, int) and saved_zombie_count >= 0:
-    zombie_count = saved_zombie_count
-
-
-saved_stage = saved_world.get("current_stage")
-saved_seed = saved_world.get("map_seed")
-
-print(
-    "LOADED WORLD:",
-    "stage =", current_stage,
-    "seed =", saved_seed,
-    "player =", (player.rect.x, player.rect.y)
-)
 saved_spritesheet = saved_world.get("spritesheet")
 saved_zombie_count = saved_world.get("zombie_count")
 if isinstance(saved_zombie_count, int) and saved_zombie_count >= 0:
@@ -474,13 +473,11 @@ def update_settings_file():
 
 
 def apply_audio_settings():
-    # The project can use these values when mixer audio is added.
     if pygame.mixer.get_init():
         pygame.mixer.music.set_volume((master_volume / 100) * (music_volume / 100))
 
 
 apply_audio_settings()
-
 
 
 def save_current_game():
@@ -515,24 +512,47 @@ hit_freeze_timer = 0
 
 while True: 
 
+    dt = clock.get_time() / 1000.0
+    player.jump = False
 
+    # *--INPUT DETECTION--*
+    for event in pygame.event.get():
 
-    player.jump = False #resets jump
-
-
-
-       # *--INPUT DETECTION--*
-    for event in pygame.event.get(): #just detects if any 'events' occur
-
-
-
-        # *--QUIT--*
         if event.type == pygame.QUIT:
             update_settings_file()
             save_current_game()
             pygame.quit()
             sys.exit()
-        # elif player.rect.right>total_map_w or player.rect.top <0 or player.rect.bottom> total_map_h:
+
+        # Perks Card Selection Logic
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and shop_active:
+            mouse_x = event.pos[0] * base_res_x / screen_state_w
+            mouse_y = event.pos[1] * base_res_y / screen_state_h
+
+            card_w, card_h = 120, 180
+            shop_slots = len(current_shop_perks)
+            start_x = (base_res_x - (shop_slots * card_w + (shop_slots - 1) * 30)) // 2
+            card_y = 85
+
+            for i in range(shop_slots):
+                card_x = start_x + i * (card_w + 30)
+                card_rect = pygame.Rect(card_x, card_y, card_w, card_h)
+                
+                if card_rect.collidepoint(mouse_x, mouse_y):
+                    perk = current_shop_perks[i]
+                    if perk is not None:
+                        if (player.DOLLARS or 0) >= perk["cost"]:
+                            player.DOLLARS = (player.DOLLARS or 0) - perk["cost"]
+                            if not hasattr(player, 'active_perks'): 
+                                player.active_perks = []
+                            player.active_perks.append(perk)
+                            current_shop_perks[i] = None 
+                            current_purchases += 1
+                            
+                            if current_purchases >= purchases_allowed:
+                                shop_active = False
+                                shop_timer = 0.0
+                    break
 
         if event.type == pygame.KEYDOWN and pause_rebinding_control is not None and paused and pause_state == "OPTIONS" and pause_options_state == "CONTROLS":
             controls[pause_rebinding_control] = pygame.key.name(event.key).title()
@@ -541,9 +561,11 @@ while True:
             update_settings_file()
             continue
 
-        # ESC opens/closes the pause menu.
+        # ESC opens/closes pause menu or shop
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            if paused and pause_state == "SKILLS":
+            if shop_active:
+                shop_active = False
+            elif paused and pause_state == "SKILLS":
                 close_skill_tree()
             elif pause_state == "OPTIONS":
                 if pause_options_state != "MAIN":
@@ -554,43 +576,75 @@ while True:
                 paused = not paused
             continue
 
+        # Interacting with Shop Orbs or toggling shop UI via 'E' key
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_e and not paused:
+            if shop_active:
+                shop_active = False
+            else:
+                player_vec = pygame.math.Vector2(player.rect.center)
+                for orb in orbs[:]:
+                    if not orb.consumed:
+                        orb_vec = pygame.math.Vector2(orb.rect.center)
+
+                        if player_vec.distance_to(orb_vec) <= 45:
+
+                            if orb.guaranteed or random.random() < orb.chance:
+                                shop_active = True
+                                shop_timer = 15.0 
+                                shop_accessed = True
+                                shop_message = "Shop Unlocked!"
+                                
+                                # Setup Perk Selection parameters based on Skill Tree
+                                num_slots = 3 + getattr(player, 'shop_slots', 0) 
+                                purchases_allowed = 1 + getattr(player, 'purchase_limit', 0)
+                                current_purchases = 0
+                                current_shop_perks = []
+                                
+                                temp_perks = list(PERKS)
+                                for _ in range(num_slots):
+                                    if not temp_perks: break
+                                    weights = [p['weight'] for p in temp_perks]
+                                    chosen = random.choices(temp_perks, weights=weights, k=1)[0]
+                                    current_shop_perks.append(chosen)
+                                    temp_perks.remove(chosen)
+                            else:
+                                shop_message = "The Orb Exploded - No Shop Access!"
+
+                            shop_msg_timer = 120
+                            orb.consumed = True
+                            orbs.remove(orb)
+                            break
+
         if event.type == pygame.KEYDOWN and event.key == pygame.K_F5:
             update_settings_file()
             save_current_game()
 
-        # K opens the skill tree straight from gameplay.
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_k and not paused:
+        # K opens skill tree
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_k and not paused and not shop_active:
             paused = True
             pause_state = "SKILLS"
             skills_opened_with_hotkey = True
-            # key-release events are ignored while paused, so let go of held movement keys now
             player.moving_left = player.moving_right = False
             player.aim_left = player.aim_right = player.aim_up = player.aim_down = False
             player.attacking = False
             skill_ui.open()
             continue
 
-        # DEBUG: F6 gives +10 Soul Coins so the skill tree can be tested.
         if DEBUG_SOUL_COINS and event.type == pygame.KEYDOWN and event.key == pygame.K_F6:
-            player.S_COIN = (player.S_COIN or 0) + 10
-        # elif player_rect.right>total_map_w or player_rect.top <0 or player_rect.bottom> total_map_h:
-        #     pygame.quit()
-        #     sys.exit()
-        # elif player.rect.left <0:
-        #     player.rect.left = 1
-        
+            player.S_COIN = (player.S_COIN or 0) + 0
+            player.DOLLARS = (player.DOLLARS or 0) + 50 
+
         # Pause menu mouse controls
         if paused:
             mouse_x = event.pos[0] * base_res_x / screen_state_w if hasattr(event, "pos") else 0
             mouse_y = event.pos[1] * base_res_y / screen_state_h if hasattr(event, "pos") else 0
 
-            # Skill tree screen: all input goes to the skill tree UI.
             if pause_state == "SKILLS":
                 skill_result = skill_ui.handle_event(event, (mouse_x, mouse_y))
                 if skill_result == "purchased":
                     apply_skill_effects(player, skill_tree, heal_on_gain=True)
                     update_settings_file()
-                    save_current_game()        # auto-save so the purchase is stored in this slot
+                    save_current_game()
                 elif skill_result == "close":
                     close_skill_tree()
                 continue
@@ -740,14 +794,18 @@ while True:
 
             continue
 
+
         # *--KEY DETECTION--*
 
         # *--WINDOW CONTROLS--*
 
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            player.holding_attack = True
-        if event.type == pygame.MOUSEBUTTONUP:
-            player.holding_attack = False
+        
+        if not shop_active:
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                player.holding_attack = True
+            if event.type == pygame.MOUSEBUTTONUP:
+                player.holding_attack = False
+
 
         if event.type == VIDEORESIZE and status == RESIZABLE:
             window_w, window_h = event.w , event.h
@@ -769,14 +827,12 @@ while True:
 
             # *--KEY PRESSED--*
         
-
-
         hor_recently_aimed = player.hor_aim_list[-1] #to prevent double input
         vert_recentely_aimed = player.vert_aim_list[-1] #to prevent double input
 
     
 
-        if event.type == pygame.KEYDOWN:
+        if event.type == pygame.KEYDOWN and not shop_active:
             if event.key == control_keys["up"] and player: #pressing W (up)
                 player.holding_up = True
                 if 'up' not in vert_recentely_aimed:
@@ -802,12 +858,13 @@ while True:
             if event.key == control_keys["jump"]:
                 player.press_space = True
 
+
             if event.key == pygame.K_LCTRL:
                 player.dash = True
             
 
             # *--KEY IS LET GO--*  
-        if event.type == pygame.KEYUP:
+        if event.type == pygame.KEYUP and not shop_active:
 
 
             if event.key == control_keys["up"]:#let go of W (up)
@@ -821,11 +878,19 @@ while True:
             
             if event.key == control_keys["right"]: #let go of D (right)
                 player.moving_right = False
-            
-            
-  
 
-    # While paused, keep the last game frame visible and only draw the menu.
+    # Shop timer
+    if shop_active:
+        shop_timer -= dt
+
+        if shop_timer <= 0:
+            shop_timer = 0
+            shop_active = False
+
+    if paused:
+        display_canvas = canvas.copy()
+
+
     if paused:
         display_canvas = canvas.copy()
 
@@ -973,13 +1038,10 @@ while True:
         chunk_world_x = chunk_x * chunk_pixel_w
         chunk_world_y = chunk_y * chunk_pixel_h
         tile_rect.extend(tile_map.get_rects(chunk_world_x,chunk_world_y))
-    # *--------------------------SPAWNING/DESPAWNING ZOMBIES----------------------------------
-
 
     # DESPAWNING ZOMBIES
     despawn_distance = 4 * chunk_pixel_w
     for zombie in zombies[:] :
-        #check if zombie position exceeds despawn distance
         if abs(zombie.rect.centerx - player.rect.centerx) > despawn_distance:
             zombies.remove(zombie)
 
@@ -988,10 +1050,8 @@ while True:
     elif player.moving_left:
         target_chunk_x = position_chunk_x - 1
     else:
-        #spawns starts at position-1
         target_chunk_x = position_chunk_x - 1
 
-    #set a tuple for the position in the grid dict
     target_chunk_position = (target_chunk_x, position_chunk_y)
 
     if target_chunk_position in loaded_chunks and target_chunk_position not in spawned_chunks:
@@ -999,12 +1059,14 @@ while True:
             spawned_chunks.add(target_chunk_position)
 
             chunk_min_x = target_chunk_x * chunk_pixel_w
-            chunk_max_x = chunk_min_x + chunk_pixel_w - 32 #-32 to account for zombie size
+            chunk_max_x = chunk_min_x + chunk_pixel_w - 32
 
-            #SPAWNING ZOMBIES
+            # SPAWNING ZOMBIES
             for _ in range(3):
-                spawn_x = random.randint(chunk_min_x, chunk_max_x)
+                if stage_spawned_zombies >= stage_max_zombies:
+                    break
 
+                spawn_x = random.randint(chunk_min_x, chunk_max_x)
                 spawn_y = 100
 
                 new_zombie = Zombie(
@@ -1016,11 +1078,11 @@ while True:
                 )
                 new_zombie.head_rect = new_zombie.generate_head_rect() #make head rect for critical hit
                 zombies.append(new_zombie)
-            stage_spawned_zombies += 1
+                stage_spawned_zombies += 1
+
     zombie_count = len(zombies)
 
-
-    # *---------------------------------------------------------------------------
+    # *--------------------------------------------------------------------------- 
     # *--PLAYER AIM CODE--*
     
     #hard locks the player to face one direction:
@@ -1193,7 +1255,7 @@ while True:
                     player.y_momentum = 0 # <-- same with this
 
 
-        #                    *--JUMP--*
+        #                    *--JUMP--
         
         #positive y momentum is downward | negative y momentum is upward
         if player.dashing is True:
@@ -1234,6 +1296,26 @@ while True:
             del_zomb = zombie.dead_check(zomb_no)
             if del_zomb is not None:
                 zombies.pop(del_zomb)
+
+                stage_dead_zombies += 1
+
+                print(f"Zombie killed: {stage_dead_zombies}")
+
+                if 7 <= stage_dead_zombies < 20:
+                    if random.random() < 0.5:   # Orb drop chance
+                        orbs.append(Orb(
+                            pygame.Rect(zombie.rect.x, zombie.rect.y, 16, 16),
+                            guaranteed=False,
+                            chance=0.7   # RNG Shop
+                        ))
+
+                elif stage_dead_zombies == 20:
+                    orbs.append(Orb(
+                        pygame.Rect(zombie.rect.x, zombie.rect.y, 16, 16),
+                        guaranteed=True,
+                        chance=1.0
+                    ))
+
             zomb_no += 1
 
         screen_shake_x, screen_shake_y = player.calculate_screen_shake(applied_damage, screen_shake_x, screen_shake_y)
@@ -1252,7 +1334,6 @@ while True:
 
         player.dead_check()
 
-        
         
         
         
@@ -1306,9 +1387,7 @@ while True:
                 else:
                     zombie.movement[0] = zombie.x_push_momentum
                     zombie.rect.x += zombie.movement[0]
-
             else:
-
 
                 if zombie.staggered == False: #if zombie is not staggered
                     if zombie.chase_player == True: #chase player
@@ -1324,7 +1403,6 @@ while True:
                                 
                         except NameError:
                             pass
-
 
 
                     else: #idle movement
@@ -1554,76 +1632,54 @@ while True:
     max_camera_x = max_world_chunks - base_res_x
     camera_x = max(min_world_chunks, min(camera_x, max_camera_x))
 
+    canvas.fill((159, 215, 255))
 
-
-    canvas.fill((159, 215, 255))    #nice sky background
-    # current_y= 0
-
-    # #filtering through the top and bottom layer in maps
-    # for row in maps:            
-    #     current_x = 0
-    #     #filtering through each screen in each row
-    #     for tile_map in row:
-    #         #drawing the map with respect to each offset
-    #         tile_map.draw_map(canvas, camera_x, camera_y, offset_x = current_x, offset_y = current_y)
-    #         #updating x offset
-    #         current_x += tile_map.map_w
-    #     #updating y offset
-    #     current_y += row[0].map_h
-
-    #X camera delay
     if abs(player.movement[0]) > 0:
-        if player.movement[0] > 0: #if player moving right
-            if x_camera_delay < 0: #if player was previously moving left
+        if player.movement[0] > 0:
+            if x_camera_delay < 0:
                 x_camera_delay += 0.8 
             else:
-                x_camera_delay += 0.4 #if from 0
+                x_camera_delay += 0.4
                 if x_camera_delay >= 20:
                     x_camera_delay = 20
-
-        if player.movement[0] < 0:#if player moving left
-            if x_camera_delay > 0:#if player was previously moving right
+        if player.movement[0] < 0:
+            if x_camera_delay > 0:
                 x_camera_delay -= 0.8
             else:
-                x_camera_delay -= 0.4 #if from 0
+                x_camera_delay -= 0.4
                 if x_camera_delay <= -20:
                     x_camera_delay = -20
     else:
-        if x_camera_delay > 0: #if player isn't moving then revert back to original
+        if x_camera_delay > 0:
             x_camera_delay -= 1.0
             if x_camera_delay <= 0:
                 x_camera_delay = 0
-
-        if x_camera_delay < 0: #same with this
+        if x_camera_delay < 0:
             x_camera_delay += 1.0
             if x_camera_delay >= 0:
                 x_camera_delay = 0
 
-    
-    #Y camera delay
     if not player.on_ground and abs(player.movement[1]) > 0:
-        if player.movement[1] > 0: #if player moving down
-            if y_camera_delay < 0: #if player was previously moving up
+        if player.movement[1] > 0:
+            if y_camera_delay < 0:
                 y_camera_delay += 0.8 
             else:
-                y_camera_delay += 0.4 #if from 0
+                y_camera_delay += 0.4
                 if y_camera_delay >= 20:
                     y_camera_delay = 20
-
-        if player.movement[1] < 0:#if player moving up
-            if y_camera_delay > 0:#if player was previously moving down
+        if player.movement[1] < 0:
+            if y_camera_delay > 0:
                 y_camera_delay -= 0.8
             else:
-                y_camera_delay -= 0.4 #if from 0
+                y_camera_delay -= 0.4
                 if y_camera_delay <= -20:
                     y_camera_delay = -20
     else:
-        if y_camera_delay > 0: #if player isn't moving then revert back to original
+        if y_camera_delay > 0:
             y_camera_delay -= 1.0
             if y_camera_delay <= 0:
                 y_camera_delay = 0
-
-        if y_camera_delay < 0: #same with this
+        if y_camera_delay < 0:
             y_camera_delay += 1.0
             if y_camera_delay >= 0:
                 y_camera_delay = 0
@@ -1646,6 +1702,7 @@ while True:
         tile_map.draw_map(canvas, (camera_x + x_camera_delay + screen_shake_x), (camera_y + y_camera_delay + screen_shake_y) ,offset_x=chunk_world_x,offset_y=chunk_world_y)
     #                                        ^positive map delay                                     ^
 
+    player_render_pos = ((player.rect.x - camera_x) - x_camera_delay, (player.rect.y - camera_y) - y_camera_delay)
 
      
     
@@ -1663,24 +1720,16 @@ while True:
         if abs(zombie_chunk_x - position_chunk_x) >= render_distance: #<-- if the zombie is out of bounds, gravity is disabled
             zombie.y_momentum = 0
 
-    #flipping code
-    
-    #player
-    if player.moving_left == True:
+    if player.moving_left:
         player.x_flip = True
-    elif player.moving_right == True:
+    elif player.moving_right:
         player.x_flip = False
-    else:
-         pass  
 
-    #zombies
     for zombie in zombies:
         if zombie.movement[0] > 0:
             zombie.x_flip = False
         elif zombie.movement[0] < 0:
             zombie.x_flip = True
-        else:
-            zombie.x_flip = False
 
     
     player.current_frames = player.update_action() #determines the current type of animation playing only if the animation mode changes
@@ -1705,7 +1754,6 @@ while True:
     # canvas.blit(player_sprite, player_render_pos)
     #                  ^ x_flip will be used in here not in the actual rendering
 
-
     for zombie in zombies:
         zombie_chunk_x = zombie.rect.centerx // chunk_pixel_w # <-- what chunk the zombie is in 
         if abs(zombie_chunk_x - position_chunk_x) <= render_distance: #<-- if the chunk distance between the zombie and player is less than the player render distance
@@ -1718,23 +1766,95 @@ while True:
                 canvas.blit(pygame.transform.flip(zombie_sprite, zombie.x_flip, False), (zombie.render_pos))
     
 
-     
+    # *-- RENDER SHOP ORBS --*
+    player_vec = pygame.math.Vector2(player.rect.center)
+    for orb in orbs:
+        if not orb.consumed:
+            orb.draw(canvas, camera_x, camera_y, x_camera_delay, y_camera_delay)
+            orb_vec = pygame.math.Vector2(orb.rect.center)
+            if player_vec.distance_to(orb_vec) <= 45:
+                render_x = orb.rect.x - camera_x - x_camera_delay
+                render_y = orb.rect.y - camera_y - y_camera_delay
+                prompt = font_pause_small.render("Press 'E'", True, (255, 255, 255))
+                canvas.blit(prompt, (render_x - 12, render_y - 20))
 
-    #^^ draws the player onto the location of its hitbox*
-    # x_flip tells the game whether it should flip the direction of the sprite on the x axis or not.
-    # all sprites are all originally drawn to the right side.
+    # Display shop result message banner
+    if shop_msg_timer > 0:
+        shop_msg_timer -= 1
+        msg_color = (100, 255, 100) if "Unlocked" in shop_message else (255, 90, 90)
+        msg_surf = font_pause_small.render(shop_message, True, msg_color)
+        canvas.blit(msg_surf, msg_surf.get_rect(center=(base_res_x / 2, 30)))
 
-    # Apply brightness to a copy so the base game frame stays unchanged.
+    # *-- RENDER SHOP OVERLAY UI (LEAGUE OF LEGENDS AUGMENTS STYLE) --*
+    if shop_active:
+        shop_overlay = pygame.Surface((base_res_x, base_res_y), pygame.SRCALPHA)
+        shop_overlay.fill((0, 0, 0, 205))
+        canvas.blit(shop_overlay, (0, 0))
+
+        shop_title = font_pause_title.render("PERKS SHOP", True, (240, 240, 240))
+        canvas.blit(shop_title, shop_title.get_rect(center=(base_res_x / 2, 30)))
+
+        # DOLLARS Display restricted exclusively to shop UI
+        dollars_text = font_pause_small.render(f"Dollars: ${player.DOLLARS or 0}", True, (50, 255, 50))
+        canvas.blit(dollars_text, dollars_text.get_rect(center=(base_res_x / 2, 55)))
+
+        card_w, card_h = 120, 180
+        shop_slots = len(current_shop_perks)
+        start_x = (base_res_x - (shop_slots * card_w + (shop_slots - 1) * 30)) // 2
+        card_y = 85
+
+        for i in range(shop_slots):
+            card_x = start_x + i * (card_w + 30)
+            card_rect = pygame.Rect(card_x, card_y, card_w, card_h)
+            
+            perk = current_shop_perks[i]
+            
+            # Handle purchased / empty slots
+            if perk is None:
+                pygame.draw.rect(canvas, (30, 30, 30), card_rect)
+                pygame.draw.rect(canvas, (70, 70, 70), card_rect, 3)
+                sold_out = font_pause_small.render("SOLD", True, (255, 50, 50))
+                canvas.blit(sold_out, sold_out.get_rect(center=card_rect.center))
+                continue
+                
+            # Render Base Card Background
+            pygame.draw.rect(canvas, (10, 10, 15), card_rect)
+
+            # Rarity Specific Visuals
+            if perk['rarity'] == 'Budget':
+                border_color = (150, 255, 150) # Light Green
+            elif perk['rarity'] == 'Mid':
+                border_color = (100, 150, 255) # Light Blue
+            else:
+                border_color = (255, 200, 50)  # Gold
+                
+            pygame.draw.rect(canvas, border_color, card_rect, 3)
+
+            # Draw Perk Title
+            name_text = font_perk_title.render(perk['name'], True, border_color)
+            canvas.blit(name_text, name_text.get_rect(midtop=(card_rect.centerx, card_rect.y + 10)))
+            
+            # Draw Detailed Wrapped Text Description
+            desc_rect = pygame.Rect(card_rect.x + 8, card_rect.y + 35, card_rect.width - 16, card_rect.height - 60)
+            draw_text_wrapped(canvas, perk['desc'], (200, 200, 200), desc_rect, font_perk_desc)
+
+            # Draw Cost at the bottom of the card
+            cost_text = font_perk_desc.render(f"${perk['cost']}", True, (50, 255, 50))
+            canvas.blit(cost_text, cost_text.get_rect(midbottom=(card_rect.centerx, card_rect.bottom - 10)))
+
+
+        timer_string = f"TIME: {max(0, shop_timer):.1f}  |  Purchases Left: {purchases_allowed - current_purchases}"
+        timer_text = font_pause_small.render(timer_string, True, (240, 240, 240))
+        canvas.blit(timer_text, timer_text.get_rect(center=(base_res_x / 2, 310)))
+
+    # Apply brightness & final render
     display_canvas = canvas.copy()
     if brightness < 50:
         display_canvas.blit(brightness_surface, (0, 0), special_flags=pygame.BLEND_RGB_MULT)
     elif brightness > 50:
         display_canvas.blit(brightness_surface, (0, 0), special_flags=pygame.BLEND_RGB_ADD)
 
-    #scale the screen
     scaled_resolution = pygame.transform.scale(display_canvas, (screen_state_w, screen_state_h))
-
-    screen.blit(scaled_resolution,(0,0))   #creates a window to be displayed
-
-    pygame.display.update() #updates the screen
-    clock.tick(60) #ensures framerate is consistently 60fps
+    screen.blit(scaled_resolution,(0,0))
+    pygame.display.update()
+    clock.tick(60)

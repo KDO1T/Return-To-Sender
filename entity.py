@@ -487,10 +487,6 @@ class Player:
             #death animation/ death screen
             pass
         
-
-
-            
-        
     
 zombies = []
 #stores each zombie's attributes within the Zombie class
@@ -547,8 +543,6 @@ class Zombie:
             self.chase_player = True 
         else:
             self.chase_player = False
-
-
             
     def touch_player(self, player_hitbox):
         if self.rect.colliderect(player_hitbox):
@@ -576,10 +570,8 @@ class Zombie:
 
         if self.attack_count >= 60:         
             self.attack_count = 0
-
-            return player_damaged
-
-
+            return True
+        return False
 
     def receive_damage(self, player_damage):
         if self.damaged == True:
@@ -717,9 +709,6 @@ class Zombie:
 
             self.knocked = False
 
-    
- 
-
     def check_staggered(self):
         if self.staggered is True:
             self.stag_count += 1
@@ -788,5 +777,19 @@ class Zombie:
 
 
 
+class Orb:
+    def __init__(self, rect, guaranteed=False, chance=0.5):
+        self.rect = rect
+        self.guaranteed = guaranteed
+        self.chance = chance
+        self.consumed = False
 
+    def draw(self, surface, camera_x, camera_y, x_camera_delay, y_camera_delay):
+        render_x = self.rect.x - camera_x - x_camera_delay
+        render_y = self.rect.y - camera_y - y_camera_delay
 
+        # Outer ring
+        color = (255, 215, 0) if self.guaranteed else (180, 100, 255)
+        pygame.draw.circle(surface, color, (int(render_x + 8), int(render_y + 8)), 10, 2)
+        # Inner solid glowing core
+        pygame.draw.circle(surface, (255, 255, 255), (int(render_x + 8), int(render_y + 8)), 6)
