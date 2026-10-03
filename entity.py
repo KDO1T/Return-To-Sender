@@ -370,7 +370,7 @@ class Player:
                     crit_damage = (self.CRIT_DMG if self.CRIT_DMG is not None else 1.5) + self.crit_dmg_bonus
                     if random.random() < crit_chance:
                         player_damage *= crit_damage
-
+ 
                     zombie.damaged = True
                     self.hit_landed = True
                     zombie.receive_damage(player_damage)
@@ -381,6 +381,7 @@ class Player:
 
                     zombie.calculate_knockback(self.aim_up,self.aim_down, self.x_flip, self.rect, self.on_ground, self.mom_force, self.attack_count)
                     self.zombies_hit.append(zombie)
+                    self.hit_number += 1
                     freeze_frame_counter = 2
 
                     if self.critical_rect == None:

@@ -122,7 +122,8 @@ def save_game(
             "LEVEL": player.LEVEL,
             "EXP": player.EXP,
             "DOLLARS": player.DOLLARS,
-            "S_COIN": player.S_COIN
+            "S_COIN": player.S_COIN,
+            "active_perks": list(getattr(player, "active_perks", []))
         },
         "position": {
             "x": player_rect.x,
@@ -181,6 +182,9 @@ def apply_save_data(data, player, player_rect, default_brightness):
     player.EXP = _value_or_default(player_data, "EXP", DEFAULT_EXP)
     player.DOLLARS = _value_or_default(player_data, "DOLLARS", DEFAULT_DOLLARS)
     player.S_COIN = _value_or_default(player_data, "S_COIN", DEFAULT_S_COIN)
+
+    saved_active_perks = player_data.get("active_perks", [])
+    player.active_perks = list(saved_active_perks) if isinstance(saved_active_perks, list) else []
 
     # Skill tree (older saves have none -> nothing purchased, ranged weapon still locked)
     skill_data = data.get("skill_tree", {})

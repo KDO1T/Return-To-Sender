@@ -212,9 +212,6 @@ selected_resolution = 1
 fullscreen = False
 
 # Audio values (0 - 100)
-master_volume = 100
-music_volume = 80
-sfx_volume = 100
 
 # Controls shared with the game
 controls = {
@@ -222,7 +219,11 @@ controls = {
     "left": "A",
     "down": "S",
     "right": "D",
-    "jump": "Space"
+    "jump": "Space",
+    "dash": "Left Ctrl",
+    "attack": "Mouse Left",
+    "interact": "E",
+    "skill_tree": "K"
 }
 
 # Brightness value
@@ -233,18 +234,29 @@ settings = load_settings()
 selected_resolution = settings["resolution_index"]
 fullscreen = settings["fullscreen"]
 brightness = settings["brightness"]
-master_volume = settings["master_volume"]
-music_volume = settings["music_volume"]
-sfx_volume = settings["sfx_volume"]
 controls.update(settings.get("controls", {}))
 
 window_w, window_h = resolution_options[selected_resolution]
 
+def get_windowed_status():
+    # A decorated window at the desktop resolution is larger than the usable screen.
+    # Use a borderless window when either requested dimension reaches the desktop size.
+    if window_w >= display_w or window_h >= display_h:
+        return pygame.NOFRAME
+    return pygame.RESIZABLE
+
+def apply_display_mode():
+    global screen, screen_state_w, screen_state_h
+    screen_state_w, screen_state_h = window_w, window_h
+    screen = pygame.display.set_mode((screen_state_w, screen_state_h), status)
+    if status == pygame.NOFRAME:
+        pygame.display.set_window_position(0, 0)
+
 if fullscreen:
     status = pygame.FULLSCREEN
-    screen_state_w, screen_state_h = display_w, display_h
+    screen_state_w, screen_state_h = window_w, window_h
 else:
-    status = pygame.RESIZABLE
+    status = get_windowed_status()
     screen_state_w, screen_state_h = window_w, window_h
 
 screen = pygame.display.set_mode((screen_state_w, screen_state_h), status)
@@ -255,9 +267,6 @@ def update_settings_file():
         "resolution_index": selected_resolution,
         "fullscreen": fullscreen,
         "brightness": brightness,
-        "master_volume": master_volume,
-        "music_volume": music_volume,
-        "sfx_volume": sfx_volume,
         "controls": controls
     })
 
@@ -533,7 +542,6 @@ while True:
 
         # Menu cards
         option_cards = [
-            "Audio Settings",
             "Video Settings",
             "Controls"
         ]
@@ -793,7 +801,7 @@ while True:
         )
         canvas.blit(controls_subtitle, controls_subtitle_rect)
 
-        panel_rect = pygame.Rect(80, 95, 480, 185)
+        panel_rect = pygame.Rect(60, 80, 520, 225)
 
         pygame.draw.rect(
             canvas,
@@ -803,16 +811,20 @@ while True:
         )
 
         control_rows = [
-            ("Move Up", controls["up"]),
-            ("Move Left", controls["left"]),
-            ("Move Down", controls["down"]),
-            ("Move Right", controls["right"]),
-            ("Jump", controls["jump"])
+            ("Aim Up", controls.get("up", "W")),
+            ("Move Left", controls.get("left", "A")),
+            ("Aim Down", controls.get("down", "S")),
+            ("Move Right", controls.get("right", "D")),
+            ("Jump", controls.get("jump", "Space")),
+            ("Dash", controls.get("dash", "Left Ctrl")),
+            ("Attack", controls.get("attack", "Mouse Left")),
+            ("Interact / Shop", controls.get("interact", "E")),
+            ("Skill Tree", controls.get("skill_tree", "K"))
         ]
 
         for index, (action, key) in enumerate(control_rows):
 
-            row_y = 118 + (index * 31)
+            row_y = 94 + (index * 24)
 
             action_text = font_section.render(
                 action,
@@ -824,7 +836,7 @@ while True:
             )
             canvas.blit(action_text, action_rect)
 
-            if rebinding_control == ["up", "left", "down", "right", "jump"][index]:
+            if rebinding_control == ["up", "left", "down", "right", "jump", "dash", "attack", "interact", "skill_tree"][index]:
                 key = "Press a key..."
 
             key_text = font_section.render(
@@ -860,111 +872,6 @@ while True:
         canvas.blit(back_text, back_rect)
 
 
-    # AUDIO sub-screen
-    elif current_state == "AUDIO":
-
-        audio_title = font_title.render(
-            "Audio",
-            False,
-            (240, 240, 240)
-        )
-        audio_title_rect = audio_title.get_rect(
-            center=(base_res_x / 2, 35)
-        )
-        canvas.blit(audio_title, audio_title_rect)
-
-        audio_subtitle = font_section.render(
-            "[ AUDIO & SOUND ]",
-            False,
-            (140, 140, 140)
-        )
-        audio_subtitle_rect = audio_subtitle.get_rect(
-            center=(base_res_x / 2, 68)
-        )
-        canvas.blit(audio_subtitle, audio_subtitle_rect)
-
-        panel_rect = pygame.Rect(60, 95, 520, 190)
-
-        pygame.draw.rect(
-            canvas,
-            (25, 25, 30),
-            panel_rect,
-            2
-        )
-
-        audio_settings = [
-            ("Master Volume", master_volume),
-            ("Music Volume", music_volume),
-            ("SFX Volume", sfx_volume)
-        ]
-
-        # Keep the sliders far enough to the right so the labels do not overlap them.
-        slider_x = 330
-        slider_width = 190
-
-        for index, (label, value) in enumerate(audio_settings):
-
-            row_y = 130 + (index * 48)
-
-            label_text = font_section.render(
-                label,
-                False,
-                (240, 240, 240)
-            )
-            label_rect = label_text.get_rect(
-                midleft=(panel_rect.left + 20, row_y)
-            )
-            canvas.blit(label_text, label_rect)
-
-            slider_y = row_y - 7
-
-            pygame.draw.rect(
-                canvas,
-                (60, 60, 70),
-                (slider_x, slider_y, slider_width, 14),
-                2
-            )
-
-            handle_x = slider_x + (value / 100 * slider_width)
-
-            pygame.draw.rect(
-                canvas,
-                (235, 65, 40),
-                (handle_x - 4, slider_y - 5, 8, 24)
-            )
-
-            value_text = font_small.render(
-                f"{value}%",
-                False,
-                (140, 140, 140)
-            )
-            value_rect = value_text.get_rect(
-                midleft=(slider_x + slider_width + 12, row_y)
-            )
-            canvas.blit(value_text, value_rect)
-
-        # Back button
-        back_text = font_section.render(
-            "Back",
-            False,
-            (240, 240, 240)
-        )
-        back_rect = back_text.get_rect(
-            center=(base_res_x / 2, 315)
-        )
-
-        mouse_x = pygame.mouse.get_pos()[0] * base_res_x / screen_state_w
-        mouse_y = pygame.mouse.get_pos()[1] * base_res_y / screen_state_h
-
-        if back_rect.collidepoint(mouse_x, mouse_y):
-            back_text = font_section.render(
-                "Back",
-                False,
-                (235, 65, 40)
-            )
-
-        canvas.blit(back_text, back_rect)
-
     # input
     for event in pygame.event.get():
 
@@ -991,10 +898,18 @@ while True:
                 )
 
 
+        # mouse control rebinding
+        elif event.type == pygame.MOUSEBUTTONDOWN and rebinding_control == "attack":
+            if event.button in (1, 2, 3):
+                controls["attack"] = {1: "Mouse Left", 2: "Mouse Middle", 3: "Mouse Right"}[event.button]
+                rebinding_control = None
+                update_settings_file()
+                continue
+
         # keyboard
         elif event.type == pygame.KEYDOWN:
 
-            if rebinding_control is not None:
+            if rebinding_control is not None and rebinding_control != "attack":
                 controls[rebinding_control] = pygame.key.name(event.key).title()
                 rebinding_control = None
                 update_settings_file()
@@ -1004,28 +919,19 @@ while True:
             if event.key == pygame.K_F1:
 
                 fullscreen = False
-                status = pygame.RESIZABLE
-
-                screen_state_w = window_w
-                screen_state_h = window_h
-
-                screen = pygame.display.set_mode(
-                    (screen_state_w, screen_state_h),
-                    status
-                )
+                status = get_windowed_status()
+                apply_display_mode()
+                update_settings_file()
 
             elif event.key == pygame.K_F11:
 
-                fullscreen = True
-                status = pygame.FULLSCREEN
-
-                screen_state_w = display_w
-                screen_state_h = display_h
-
-                screen = pygame.display.set_mode(
-                    (display_w, display_h),
-                    status
-                )
+                fullscreen = not fullscreen
+                if fullscreen:
+                    status = pygame.FULLSCREEN
+                else:
+                    status = get_windowed_status()
+                apply_display_mode()
+                update_settings_file()
 
             elif renaming_save:
 
@@ -1217,7 +1123,6 @@ while True:
 
                     # Handle menu cards
                     option_cards = [
-                        "Audio Settings",
                         "Video Settings",
                         "Controls"
                     ]
@@ -1233,11 +1138,7 @@ while True:
 
                         if card_rect.collidepoint(mouse_pos):
 
-                            if option == "Audio Settings":
-                                current_state = "AUDIO"
-                                dropdown_open = False
-
-                            elif option == "Video Settings":
+                            if option == "Video Settings":
                                 current_state = "VIDEO"
                                 dropdown_open = False
 
@@ -1296,14 +1197,9 @@ while True:
                                 window_h = selected_height
                                 
                                 # Only update the active window when in windowed mode
-                                if status == pygame.RESIZABLE:
-                                    screen_state_w = window_w
-                                    screen_state_h = window_h
-                                    
-                                    screen = pygame.display.set_mode(
-                                        (screen_state_w, screen_state_h),
-                                        status
-                                    )
+                                if not fullscreen:
+                                    status = get_windowed_status()
+                                    apply_display_mode()
                                 
                                 break
 
@@ -1322,23 +1218,9 @@ while True:
 
                         if fullscreen:
                             status = pygame.FULLSCREEN
-                            screen_state_w = display_w
-                            screen_state_h = display_h
-
-                            screen = pygame.display.set_mode(
-                                (display_w, display_h),
-                                status
-                            )
-
                         else:
-                            status = pygame.RESIZABLE
-                            screen_state_w = window_w
-                            screen_state_h = window_h
-
-                            screen = pygame.display.set_mode(
-                                (screen_state_w, screen_state_h),
-                                status
-                            )
+                            status = get_windowed_status()
+                        apply_display_mode()
 
                     # Brightness slider
                     brightness_slider_rect = pygame.Rect(
@@ -1372,11 +1254,15 @@ while True:
                         rebinding_control = None
 
                     control_rows = [
-                        ("up", 118),
-                        ("left", 149),
-                        ("down", 180),
-                        ("right", 211),
-                        ("jump", 242)
+                        ("up", 94),
+                        ("left", 118),
+                        ("down", 142),
+                        ("right", 166),
+                        ("jump", 190),
+                        ("dash", 214),
+                        ("attack", 238),
+                        ("interact", 262),
+                        ("skill_tree", 286)
                     ]
 
                     for control_name, row_y in control_rows:
@@ -1385,53 +1271,6 @@ while True:
                             rebinding_control = control_name
                             break
 
-
-                elif current_state == "AUDIO":
-
-                    back_rect = pygame.Rect(
-                        0,
-                        310,
-                        base_res_x,
-                        40
-                    )
-
-                    if back_rect.collidepoint(mouse_pos):
-                        current_state = "OPTIONS"
-
-                    # Audio slider hitboxes
-                    audio_sliders = [
-                        ("master", 130),
-                        ("music", 178),
-                        ("sfx", 226)
-                    ]
-
-                    for slider_name, slider_y in audio_sliders:
-
-                        slider_rect = pygame.Rect(
-                            330,
-                            slider_y - 9,
-                            190,
-                            18
-                        )
-
-                        if slider_rect.collidepoint(mouse_pos):
-                            drag = True
-                            dragging_slider = slider_name
-
-                            value = int(
-                                (mouse_x - 330) / 190 * 100
-                            )
-                            value = max(0, min(100, value))
-
-                            if slider_name == "master":
-                                master_volume = value
-                            elif slider_name == "music":
-                                music_volume = value
-                            elif slider_name == "sfx":
-                                sfx_volume = value
-
-                            update_settings_file()
-                            break
 
     # Continuous slider dragging
     if drag:
@@ -1445,24 +1284,6 @@ while True:
                     (mouse_x - 270) / 220 * 100
                 )
                 brightness = max(0, min(100, brightness))
-
-            elif dragging_slider == "master" and current_state == "AUDIO":
-                master_volume = int(
-                    (mouse_x - 330) / 190 * 100
-                )
-                master_volume = max(0, min(100, master_volume))
-
-            elif dragging_slider == "music" and current_state == "AUDIO":
-                music_volume = int(
-                    (mouse_x - 330) / 190 * 100
-                )
-                music_volume = max(0, min(100, music_volume))
-
-            elif dragging_slider == "sfx" and current_state == "AUDIO":
-                sfx_volume = int(
-                    (mouse_x - 330) / 190 * 100
-                )
-                sfx_volume = max(0, min(100, sfx_volume))
 
             update_settings_file()
 
