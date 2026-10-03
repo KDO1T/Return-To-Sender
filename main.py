@@ -180,6 +180,7 @@ player = Player(
     attack_rect = None,
     critical_rect = None,
     shock_rect = None,
+    retaliate_rect = None,
     movement=[0,0],
     moving_up = False,
     moving_down = False,
@@ -244,6 +245,7 @@ player = Player(
     final_arsenal=False,
     dash_speed_count = 150,
     increase_move_speed = False,
+    retaliate = False
 )
 
 player_rect = player.rect
@@ -1254,8 +1256,6 @@ while True:
     # ---------------------------------PERKS------------------------------------------------------------------
     
         player.check_perks()
-        player.phantom_step = True
-
 
    # *---------------------------------------------------------------------------
         # *--PLAYER HORIZONTAL MOVEMENT + COLLISIONS--*
@@ -1426,9 +1426,10 @@ while True:
         del_zomb = None
         player_damage = 0
         total_damage = 0
+
         player.check_cooldown()
         player.update_attack_hitbox()
-        applied_damage, hit_freeze_timer = player.attack(zombies, hit_freeze_timer) 
+        applied_damage, hit_freeze_timer = player.attack(zombies, hit_freeze_timer, current_stage) 
 
         for zombie in zombies:
             zombie.check_on_fire()
@@ -1437,10 +1438,15 @@ while True:
             del_zomb = zombie.dead_check(zomb_no)
             if del_zomb is not None:
                 zombies.pop(del_zomb)
-
                 stage_dead_zombies += 1
-
+                
                 print(f"Zombie killed: {stage_dead_zombies}")
+
+                if player.blood_siphon:
+                    siphoned_blood = (0.04*player.max_HP)
+                    player.HP += siphoned_blood
+                else:
+                    pass
 
                 if 7 <= stage_dead_zombies < 20:
                     if random.random() < 0.1:   # Orb drop chance
@@ -1457,7 +1463,9 @@ while True:
                         chance=1.0
                     ))
 
-            zomb_no += 1
+                zomb_no += 1
+
+            
 
         screen_shake_x, screen_shake_y = player.calculate_screen_shake(applied_damage, screen_shake_x, screen_shake_y)
         
@@ -1472,6 +1480,8 @@ while True:
                 player.damaged = zombie.attack_player(player.damaged)
 
             hit_freeze_timer = player.receive_damage(zombie.ATK, hit_freeze_timer)
+
+        player.retaliatory_rect_collision(zombies)
 
         current_stage = player.dead_check(current_stage, stage_min_chunk_x, world.chunk_pixel_w)
 
@@ -1906,6 +1916,12 @@ while True:
         shock_hitbox = pygame.Surface((player.shock_rect.width,player.shock_rect.height), pygame.SRCALPHA)
         shock_hitbox.fill((173, 216, 230, 128))
         canvas.blit(shock_hitbox, (player.shock_rect.x - camera_x - x_camera_delay - screen_shake_x, player.shock_rect.y - camera_y - y_camera_delay - screen_shake_y))
+
+
+    if player.retaliate_rect is not None:
+        retaliate_hitbox = pygame.Surface((player.retaliate_rect.width,player.retaliate_rect.height), pygame.SRCALPHA)
+        retaliate_hitbox.fill((255, 0, 0, 128))
+        canvas.blit(retaliate_hitbox, (player.retaliate_rect.x - camera_x - x_camera_delay - screen_shake_x, player.retaliate_rect.y - camera_y - y_camera_delay - screen_shake_y))
 
     # pygame.draw.rect(canvas, (255,0,0), player.attack_rect)
    
