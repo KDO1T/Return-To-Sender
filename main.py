@@ -124,7 +124,7 @@ font_pause_title = pygame.font.Font("fonts/Press_Start_2P/PressStart2P.ttf", 24)
 font_pause = pygame.font.Font("fonts/VT323/VT323.ttf", 34)
 font_pause_small = pygame.font.Font("fonts/VT323/VT323.ttf", 26)
 font_perk_title = pygame.font.Font("fonts/VT323/VT323.ttf", 18)
-font_perk_desc = pygame.font.Font("fonts/VT323/VT323.ttf", 14)
+font_perk_desc = pygame.font.Font("fonts/VT323/VT323.ttf", 14)  
 
 
 # *------------------------------------------------------------------- PERKS DATA -----------------------------------------------------------------------------------------*
@@ -199,7 +199,7 @@ player = Player(
     aim_left = False,
     y_momentum = 0,
     x_momentum = 0,
-    max_air_jumps = 50, #50
+    max_air_jumps = 2, #50
     jump = False,
     jump_height = 4.5,
     on_ground = None,
@@ -234,6 +234,8 @@ player.hor_aim_list.append('right')
 player.hor_aim_list.append('right')
 player.vert_aim_list.append('up')
 player.vert_aim_list.append('up')
+
+
 
 # *--------------------------------------------ENTITIES-------------------------------------------------------*
 
@@ -1286,6 +1288,13 @@ while True:
                 if player.movement[0] < 0:
                     player.rect.left = tile.right
 
+        for rect in collision_rects:
+                    if player.rect.colliderect(rect):
+                        if player.movement[0] > 0:
+                            player.rect.right = rect.left
+                        if player.movement[0]< 0:
+                            player.rect.left = rect.right
+
         #clamping
         if player.rect.left < min_world_chunks:
             player.rect.left = min_world_chunks
@@ -1334,6 +1343,17 @@ while True:
                 if player.movement[1] < 0:
                     player.rect.top = tile.bottom
                     player.y_momentum = 0 # <-- same with this
+                
+        for rect in collision_rects:
+                if player.rect.colliderect(rect):
+                    if player.movement[1] > 0:
+                        player.rect.bottom = rect.top
+                        player.y_momentum = 0 
+                        player.on_ground = True
+                
+                    if player.movement[1] < 0:
+                        player.rect.top = rect.bottom
+                        player.y_momentum = 0 
 
 
         #                    *--JUMP--
@@ -1383,7 +1403,7 @@ while True:
                 print(f"Zombie killed: {stage_dead_zombies}")
 
                 if 7 <= stage_dead_zombies < 20:
-                    if random.random() < 0.5:   # Orb drop chance
+                    if random.random() < 0.1:   # Orb drop chance
                         orbs.append(Orb(
                             pygame.Rect(zombie.rect.x, zombie.rect.y, 16, 16),
                             guaranteed=False,
@@ -1791,7 +1811,7 @@ while True:
     for obstacle in obstacles:   
         obstacle.update(tile_rect)
         
-        obstacle.draw(canvas, camera_x, camera_y, x_camera_delay, y_camera_delay)
+        obstacle.draw(canvas, camera_x, camera_y, x_camera_delay, y_camera_delay,screen_shake_x , screen_shake_y)
     
     # player_render_pos = ((player.rect.x- camera_x) - x_camera_delay - 48, (player.rect.y-  camera_y) - y_camera_delay -48) #centers player on screen
     # #                                                                                                   ^negative camera delay

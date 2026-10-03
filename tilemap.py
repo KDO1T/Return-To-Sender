@@ -137,6 +137,6 @@ class Obstacle(pygame.sprite.Sprite):
         
 
 
-    def draw(self, surface, camera_x, camera_y, delay_x=0, delay_y=0):
-        render_pos = (self.rect.x - camera_x - delay_x, self.rect.y - camera_y - delay_y)
+    def draw(self, surface, camera_x, camera_y, screen_shake_x , screen_shake_y, delay_x=0, delay_y=0):
+        render_pos = (self.rect.x - camera_x - delay_x - screen_shake_x, self.rect.y - camera_y - delay_y - screen_shake_y)
         surface.blit(self.image, render_pos)
