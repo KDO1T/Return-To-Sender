@@ -81,3 +81,62 @@ class TileMap():
             world_rect.y += offset_y
             world_rect_list.append(world_rect)
         return world_rect_list
+
+class Obstacle(pygame.sprite.Sprite):
+    def __init__(self, sprite_name, x, y, spritesheet, solid=True, width=32, height=32):
+        super().__init__()
+        self.image = spritesheet.parse_sprite(sprite_name)
+        self.solid = solid
+
+        self.rect = pygame.Rect(x,y,width,height)
+        self.velocity_y = 0
+        self.gravity = 0.8
+        self.is_grounded = False
+
+    def check_object_collisions(self, tile_map, tile_size, chunk_x, chunk_y, chunk_pixel_w, chunk_pixel_h):
+        num_rows = len(tile_map)
+        if num_rows == 0:
+            return
+        num_cols = len(tile_map[0])
+        #loops through to check for collisions
+
+        chunk_world_x = chunk_x * chunk_pixel_w
+        chunk_world_y = chunk_y * chunk_pixel_h
+    
+        for row in range(num_rows):
+            for col in range(num_cols):
+                tile_type = tile_map[row][col]
+
+                if tile_type != '-1':
+                    tile_rect = pygame.Rect(
+                        chunk_world_x*(col*tile_size),
+                        chunk_world_y*(row*tile_size),
+                        tile_size,
+                        tile_size
+                    )
+
+    def update(self, tile_rect):
+        if not self.is_grounded:
+            #Apply gravity
+            self.velocity_y += self.gravity
+            if self.velocity_y > 8.0:
+                self.velocity_y = 8.0
+
+            self.rect.y += self.velocity_y
+
+            #if collides with rect
+            
+            for tile in tile_rect:
+                if self.rect.colliderect(tile):
+                    #landing on the tile
+                    if self.velocity_y > 0:
+                        self.rect.bottom = tile.top
+                        self.velocity_y = 0
+                        self.is_grounded = True
+                        break
+        
+
+
+    def draw(self, surface, camera_x, camera_y, screen_shake_x , screen_shake_y, delay_x=0, delay_y=0):
+        render_pos = (self.rect.x - camera_x - delay_x - screen_shake_x, self.rect.y - camera_y - delay_y - screen_shake_y)
+        surface.blit(self.image, render_pos)
