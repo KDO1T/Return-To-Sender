@@ -610,6 +610,7 @@ while True:
             start_x = (base_res_x - (shop_slots * card_w + (shop_slots - 1) * 30)) // 2
             card_y = 85
 
+
             for i in range(shop_slots):
                 card_x = start_x + i * (card_w + 30)
                 card_rect = pygame.Rect(card_x, card_y, card_w, card_h)
@@ -1732,7 +1733,7 @@ while True:
 
     
      #map clamping      
-    max_camera_x = max_world_chunks - base_res_x
+    max_camera_x = max_world_chunks - base_res_x - screen_shake_x - x_camera_delay
     camera_x = max(min_world_chunks, min(camera_x, max_camera_x))
 
     canvas.fill((159, 215, 255))
