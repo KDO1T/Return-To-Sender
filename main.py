@@ -1179,7 +1179,7 @@ while True:
                     pygame.Rect(spawn_x, spawn_y, 32 ,32), [],0,0,0,None,
                     [0,0], 0 , 0 , 0, False, (0,0), False, 
                     'Still', False, random.randint(1,3),0,0, False,
-                    False, False, False, 0, 45, False, 240, int(current_stage*5 + 15), 
+                    False, False, False, 0, 45, False, 240,False, 120, int(current_stage*5 + 15), 
                     int(current_stage*2 + 5)
                 )
                 new_zombie.head_rect = new_zombie.generate_head_rect() #make head rect for critical hit
@@ -1252,8 +1252,8 @@ while True:
     # ---------------------------------PERKS------------------------------------------------------------------
     
         player.check_perks()
+        player.heavy_cleave = True
         player.conductive_blade = True
-
 
 
    # *---------------------------------------------------------------------------
@@ -1425,6 +1425,7 @@ while True:
 
         for zombie in zombies:
             zombie.check_on_fire()
+            zombie.check_shocked()
             zombie.check_staggered()    
             del_zomb = zombie.dead_check(zomb_no)
             if del_zomb is not None:
@@ -1525,13 +1526,23 @@ while True:
 
                         try:
                             if zombie.rect.centerx > player.rect.centerx:
-                                zombie.movement[0] = -zombie.chase_speed
-                                zombie.rect.x += zombie.movement[0]
+                                if zombie.shocked:
+                                    zombie.movement[0] = -zombie.chase_speed//2
+                                    zombie.rect.x += zombie.movement[0]
+                                else:
+                                    zombie.movement[0] = -zombie.chase_speed
+                                    zombie.rect.x += zombie.movement[0]
+
 
                             if zombie.rect.centerx < player.rect.centerx:
-                                zombie.movement[0] = zombie.chase_speed
-                                zombie.rect.x += zombie.movement[0]
-                                
+                                if zombie.shocked:
+                                    zombie.movement[0] = zombie.chase_speed//2
+                                    zombie.rect.x += zombie.movement[0]
+                                else:
+                                    zombie.movement[0] = zombie.chase_speed
+                                    zombie.rect.x += zombie.movement[0]    
+
+
                         except NameError:
                             pass
 
@@ -1544,13 +1555,21 @@ while True:
                         
                         #move right
                         if zombie.idle_move == 'Right':
-                            zombie.movement[0] = random_zomb_speed
-                            zombie.rect.x += zombie.movement[0]
+                            if zombie.shocked:
+                                zombie.movement[0] = random_zomb_speed//2
+                                zombie.rect.x += zombie.movement[0]
+                            else:
+                                zombie.movement[0] = random_zomb_speed
+                                zombie.rect.x += zombie.movement[0]
 
                         #move left
                         if zombie.idle_move == 'Left':
-                            zombie.movement[0] = -random_zomb_speed
-                            zombie.rect.x += zombie.movement[0]
+                            if zombie.shocked:
+                                zombie.movement[0] = -random_zomb_speed//2
+                                zombie.rect.x += zombie.movement[0]
+                            else:
+                                zombie.movement[0] = -random_zomb_speed
+                                zombie.rect.x += zombie.movement[0]
 
                         #dont move
                         if zombie.idle_move == 'Still':
@@ -1880,14 +1899,16 @@ while True:
 
     # pygame.draw.rect(canvas, (255,0,0), player.attack_rect)
    
-    # for zombie in zombies:
-    #     pygame.draw.rect(canvas, (0,255, 255), (zombie.rect.x - camera_x - x_camera_delay, zombie.rect.y - camera_y -y_camera_delay, zombie.rect.width, zombie.rect.height))
-    # for zombie in zombies:
-    #     pygame.draw.rect(canvas, (0,0, 255), (zombie.head_rect.x - camera_x - x_camera_delay, zombie.head_rect.y - camera_y -y_camera_delay, zombie.head_rect.width, zombie.head_rect.height))
+    for zombie in zombies:
+        pygame.draw.rect(canvas, (0,255, 255), (zombie.rect.x - camera_x - x_camera_delay, zombie.rect.y - camera_y -y_camera_delay, zombie.rect.width, zombie.rect.height))
+    for zombie in zombies:
+        pygame.draw.rect(canvas, (0,0, 255), (zombie.head_rect.x - camera_x - x_camera_delay, zombie.head_rect.y - camera_y -y_camera_delay, zombie.head_rect.width, zombie.head_rect.height))
     
-    # if player.attack_rect is not None and player.critical_rect is not None:
-    #     pygame.draw.rect(canvas, (255, 0, 0), (player.attack_rect.x - camera_x - x_camera_delay, player.attack_rect.y - camera_y -y_camera_delay, player.attack_rect.width, player.attack_rect.height), 2)
-    #     pygame.draw.rect(canvas, (0, 255, 0), (player.critical_rect.x - camera_x - x_camera_delay, player.critical_rect.y - camera_y -y_camera_delay, player.critical_rect.width, player.critical_rect.height), 2)
+
+    if player.attack_rect is not None:
+        pygame.draw.rect(canvas, (255, 0, 0), (player.attack_rect.x - camera_x - x_camera_delay, player.attack_rect.y - camera_y -y_camera_delay, player.attack_rect.width, player.attack_rect.height), 2)
+    if player.critical_rect is not None:   
+        pygame.draw.rect(canvas, (0, 255, 0), (player.critical_rect.x - camera_x - x_camera_delay, player.critical_rect.y - camera_y -y_camera_delay, player.critical_rect.width, player.critical_rect.height), 2)
     if player.shock_rect is not None:
         pygame.draw.rect(canvas, (0, 0, 255), (player.shock_rect.x - camera_x - x_camera_delay, player.shock_rect.y - camera_y -y_camera_delay, player.shock_rect.width, player.shock_rect.height), 2)
         
@@ -1911,6 +1932,15 @@ while True:
                 fire_overlay.fill((255, 165, 0)) 
                 fire_version.blit(fire_overlay, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
                 zombie_sprite = fire_version
+            else:
+                pass
+
+            if zombie.shocked:
+                shocked_version = zombie_sprite.copy()
+                shocked_overlay = pygame.Surface(shocked_version.get_size(), pygame.SRCALPHA)
+                shocked_overlay.fill((0, 0, 139)) 
+                shocked_version.blit(shocked_overlay, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+                zombie_sprite = shocked_version
             else:
                 pass
             if zombie.animation_mode != 0:

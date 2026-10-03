@@ -352,36 +352,43 @@ class Player:
         if self.attacking and self.attack_count in (5,25,45):
             self.zombies_hit.clear()
 
-        
         face_right = not self.x_flip #if facing right, it will be true
+
 
         if self.attacking and (swing_1_active_window or swing_2_active_window or swing_3_active_window):
 
             if self.conductive_blade and swing_3_active_window:
-                self.shock_rect = pygame.Rect(self.rect.centerx - 50, self.rect.y-15, 100, 50)
+                self.shock_rect = pygame.Rect(self.rect.centerx - 75, self.rect.y-15, 150, 50)
                 pass
 
+            if self.heavy_cleave:
+                x_size_increase = 20
+                y_size_increase = -10
+            else:
+                x_size_increase = 0
+                y_size_increase = 0
+            
             if self.aim_up:
                 if face_right is True:
-                    self.attack_rect = pygame.Rect(self.rect.x + 5, self.rect.top - 10, 50, 40)
+                    self.attack_rect = pygame.Rect(self.rect.x + 5 , self.rect.top - 10, 50 + x_size_increase, 40 -y_size_increase)
                 else:
-                    self.attack_rect = pygame.Rect(self.rect.x - 23, self.rect.top -10, 50, 40)
+                    self.attack_rect = pygame.Rect(self.rect.x - 23 - x_size_increase, self.rect.top -10, 50 + x_size_increase, 40 -y_size_increase)
 
 
             elif self.aim_down and not self.on_ground :
                 if face_right is True:
-                    self.critical_rect = pygame.Rect(self.rect.x +3 , self.rect.bottom + 5, 20,15)
-                    self.attack_rect = pygame.Rect(self.rect.x - 20, self.rect.bottom - 15, 68, 36)
+                    self.critical_rect = pygame.Rect(self.rect.x +3 , self.rect.bottom + 5, 20 ,15)
+                    self.attack_rect = pygame.Rect(self.rect.x - 20, self.rect.bottom - 15, 68 +  + x_size_increase, 36 -y_size_increase)
                 else:
                     self.critical_rect = pygame.Rect(self.rect.x +11, self.rect.bottom + 5, 20,15)
-                    self.attack_rect = pygame.Rect(self.rect.x - 10, self.rect.bottom - 15, 68, 36)
+                    self.attack_rect = pygame.Rect(self.rect.x - 10 +y_size_increase, self.rect.bottom - 15, 68  + x_size_increase, 36 -y_size_increase)
             
             else:
 
                 if self.aim_right:
-                    self.attack_rect = pygame.Rect(self.rect.right-13, self.rect.y, 40, 32)
+                    self.attack_rect = pygame.Rect(self.rect.right-13 , self.rect.y, 40 + x_size_increase, 32 -y_size_increase)
                 elif self.aim_left:
-                    self.attack_rect = pygame.Rect(self.rect.left-27, self.rect.y, 40, 32)
+                    self.attack_rect = pygame.Rect(self.rect.left-27 - x_size_increase, self.rect.y, 40 + x_size_increase, 32 -y_size_increase)
         else:
             self.attack_rect = None
             self.critical_rect = None
@@ -437,7 +444,12 @@ class Player:
                             zombie.fire_count = 240
                         else:
                             pass
-            
+
+                    if self.conductive_blade and self.shock_rect is not None and self.shock_rect.colliderect(zombie.rect):
+                        zombie.shocked = True
+                        zombie.shocked_count = 120
+                    else:
+                        pass
 
 
                     zombie.damaged = True
@@ -451,7 +463,9 @@ class Player:
                     self.zombies_hit.append(zombie)
                     freeze_frame_counter = 2
 
-                    zombie.calculate_knockback(self.aim_up,self.aim_down, self.x_flip, self.rect, self.on_ground, self.mom_force, self.attack_count, x_shock_knockback, y_shock_knockback)
+                    heavy_knockback = self.heavy_cleave
+
+                    zombie.calculate_knockback(self.aim_up,self.aim_down, self.x_flip, self.rect, self.on_ground, self.mom_force, self.attack_count, x_shock_knockback, y_shock_knockback, heavy_knockback)
 
                     if self.critical_rect == None:
                         return player_damage, freeze_frame_counter
@@ -517,7 +531,7 @@ class Player:
         perk_names = {perk["name"] for perk in self.active_perks}
         self.ignition_edge = "Ignition Edge" in perk_names
         # self.conductive_blade = "Conductive Blade" in perk_names
-        self.heavy_cleave = "Heavy Cleave" in perk_names
+        # self.heavy_cleave = "Heavy Cleave" in perk_names
         self.phantom_step = "Phantom Step" in perk_names
         self.executioner_stance = "Executioner" in perk_names
         self.blood_siphon = "Blood Siphon" in perk_names
@@ -554,7 +568,7 @@ class Zombie:
     def __init__(self, rect,current_frames,animation_mode, frame_index, animation_count, head_rect, movement, x_push_momentum,
                   y_push_momentum, y_momentum, x_flip, render_pos, on_ground, idle_move, chase_player, chase_speed ,
                  attack_count, player_touch_cooldown, touched_player, knocked, damaged, staggered,stag_count,max_stag_count, 
-                 on_fire, fire_count, HP, ATK):
+                 on_fire, fire_count, shocked, shocked_count, HP, ATK):
         self.rect = rect
         self.current_frames = current_frames
         self.animation_mode = animation_mode
@@ -581,6 +595,8 @@ class Zombie:
         self.max_stag_count = max_stag_count
         self.on_fire = on_fire
         self.fire_count = fire_count #<-- set to 240 (4 seconds)
+        self.shocked = shocked
+        self.shocked_count = shocked_count
         self.HP = HP
         self.ATK = ATK
 
@@ -597,6 +613,13 @@ class Zombie:
                 print('ow that fire hurt')
             else:
                 pass
+
+    def check_shocked(self):
+        if self.shocked:
+            self.shocked_count -= 1
+            if self.shocked_count <= 0:
+                self.shocked = False
+
 
 
     def generate_head_rect(self):
@@ -664,8 +687,9 @@ class Zombie:
 
 
 
-    def calculate_knockback(self, up_force,down_force, player_x_direction, player_rect, mid_air, player_force, player_attack_count, x_shock_knockback, y_shock_knockback):
+    def calculate_knockback(self, up_force,down_force, player_x_direction, player_rect, mid_air, player_force, player_attack_count, x_shock_knockback, y_shock_knockback, heavy_cleave_bool):
 
+      
         if self.knocked == True:
 
             if not mid_air: #air knockback 
@@ -777,9 +801,20 @@ class Zombie:
                             self.x_push_momentum -= player_force//4
                             self.y_push_momentum += -player_force
 
+
+            if heavy_cleave_bool:
+                if player_x_direction == False: #facing right
+                    x_heavy_knockback = 20
+                    y_heavy_knockback = -10
+                else: #facing left
+                    x_heavy_knockback = -20
+                    y_heavy_knockback = -10
+    
+
             #shock knockback
-            self.x_push_momentum += x_shock_knockback
-            self.y_push_momentum += y_shock_knockback
+            self.x_push_momentum += x_shock_knockback + x_heavy_knockback
+            self.y_push_momentum += y_shock_knockback + y_heavy_knockback
+
 
 
             self.knocked = False
