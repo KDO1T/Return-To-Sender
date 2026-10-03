@@ -177,7 +177,7 @@ player = Player(
     frame_index = 0,
     animation_mode = 0,
     animation_count = 0,    
-    max_HP = 50,
+    max_HP = 100,
     i_counter = 0,
     invulnerable= False,
     damaged=False,
@@ -219,7 +219,7 @@ for i in range(23):
 
 # *------------------------------ANIMATION------------------------------------------------------------------------
 
-jimmy_sheet = Spritesheet('animations/spritesheets/jimmy_sheet.png')
+jimmy_sheet = Spritesheet('animations/spritesheets/jimmy_sheet2.png')
 
 #LOAD PLAYER ANIMATIONS:
 
@@ -287,6 +287,11 @@ for i in range(4):# 120:123, mode 17
     filename = f'dash_left_{i}'
     player.all_frames.append(jimmy_sheet.parse_sprite(filename))
 
+filename = 'damage_right'
+player.all_frames.append(jimmy_sheet.parse_sprite(filename))
+
+filename = 'damage_left'
+player.all_frames.append(jimmy_sheet.parse_sprite(filename))
 
 
 
@@ -1241,9 +1246,11 @@ while True:
             zombie.touch_player(player.rect)
             zombie.check_cooldown()
             if zombie.staggered == False:
-                player.damaged = zombie.attack_player(player.HP)
+                player.damaged = zombie.attack_player(player.damaged)
+
             hit_freeze_timer = player.receive_damage(zombie.ATK, hit_freeze_timer)
-            player.dead_check()
+
+        player.dead_check()
 
         
         
@@ -1416,6 +1423,7 @@ while True:
         #dashing
         elif player.dashing == True and player.aim_left: 
             player.animation_mode = 17
+
 
         #attacking up while falling
         elif player.on_ground == False and player.y_momentum > 0 and player.attacking and player.aim_up and player.aim_right:#right
@@ -1683,14 +1691,14 @@ while True:
 
     # pygame.draw.rect(canvas, (255,0,0), player.attack_rect)
    
-    for zombie in zombies:
-        pygame.draw.rect(canvas, (0,255, 255), (zombie.rect.x - camera_x - x_camera_delay, zombie.rect.y - camera_y -y_camera_delay, zombie.rect.width, zombie.rect.height))
-    for zombie in zombies:
-        pygame.draw.rect(canvas, (0,0, 255), (zombie.head_rect.x - camera_x - x_camera_delay, zombie.head_rect.y - camera_y -y_camera_delay, zombie.head_rect.width, zombie.head_rect.height))
+    # for zombie in zombies:
+    #     pygame.draw.rect(canvas, (0,255, 255), (zombie.rect.x - camera_x - x_camera_delay, zombie.rect.y - camera_y -y_camera_delay, zombie.rect.width, zombie.rect.height))
+    # for zombie in zombies:
+    #     pygame.draw.rect(canvas, (0,0, 255), (zombie.head_rect.x - camera_x - x_camera_delay, zombie.head_rect.y - camera_y -y_camera_delay, zombie.head_rect.width, zombie.head_rect.height))
     
-    if player.attack_rect is not None and player.critical_rect is not None:
-        pygame.draw.rect(canvas, (255, 0, 0), (player.attack_rect.x - camera_x - x_camera_delay, player.attack_rect.y - camera_y -y_camera_delay, player.attack_rect.width, player.attack_rect.height), 2)
-        pygame.draw.rect(canvas, (0, 255, 0), (player.critical_rect.x - camera_x - x_camera_delay, player.critical_rect.y - camera_y -y_camera_delay, player.critical_rect.width, player.critical_rect.height), 2)
+    # if player.attack_rect is not None and player.critical_rect is not None:
+    #     pygame.draw.rect(canvas, (255, 0, 0), (player.attack_rect.x - camera_x - x_camera_delay, player.attack_rect.y - camera_y -y_camera_delay, player.attack_rect.width, player.attack_rect.height), 2)
+    #     pygame.draw.rect(canvas, (0, 255, 0), (player.critical_rect.x - camera_x - x_camera_delay, player.critical_rect.y - camera_y -y_camera_delay, player.critical_rect.width, player.critical_rect.height), 2)
         
     #new player render code:
     # above this will be the code determining the sprite and rect

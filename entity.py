@@ -141,7 +141,13 @@ class Player:
 
         if self.animation_mode == 17: 
             self.current_frames = self.all_frames[120:123]
-    
+
+        # if self.animation_mode == 18:
+        #     self.current_frames = self.all_frames[123:124]
+
+        # if self.animation_mode == 19:
+        #     self.current_frames = self.all_frames[124:125]    
+
         return self.current_frames
 
     
@@ -206,6 +212,12 @@ class Player:
 
         if self.animation_mode == 17: 
             self.frame_index = (self.animation_count // 5) % len(self.current_frames)
+
+        # if self.animation_mode == 18:
+        #     self.frame_index = 0
+
+        # if self.animation_mode == 19: 
+        #     self.frame_index = 0
 
 
     def init_dash(self):
@@ -362,7 +374,7 @@ class Player:
                     #External multiplier
                     print(self.combo_stage)
                     print(self.damage_mult)
-                    player_damage =(self.base_ATK or 0) * self.damage_mult **(self.combo_stage)
+                    player_damage =(self.base_ATK or 0) * self.damage_mult * (self.combo_stage)
                     print(player_damage)
                     
                     #Crit multiplier
@@ -441,11 +453,13 @@ class Player:
 
     def receive_damage(self, zombie_damage, freeze_frames):
         if self.damaged is True:
-
+            self.damaged = False
             if self.invulnerable == False: 
                 zombie_damage = max(1, round(zombie_damage * (1 - self.damage_reduction)))
+                print(zombie_damage)
+                print('HP:', self.HP)
                 self.HP -= zombie_damage
-                self.damaged = False
+             
                 freeze_frames = 2  
                 if self.HP > 0:
                     print(f'i have been hit by this filthy zombie for {zombie_damage} and now im {self.HP}. my maxHP is {self.max_HP}') 
@@ -465,6 +479,11 @@ class Player:
 
     def dead_check(self):
         if self.HP <= 0:
+            self.DOLLARS 
+            #reset map position
+            #reset dollars
+            #reset perks
+            #reset everything except soul coins
             #death animation/ death screen
             pass
         
@@ -549,7 +568,7 @@ class Zombie:
             self.attack_count = 0
     
     def attack_player(self, player_damaged): 
-
+        
         if self.attack_count == 37:  #the zombie hits the player at the end of the 4th frame    
             player_damaged = True
             return player_damaged
