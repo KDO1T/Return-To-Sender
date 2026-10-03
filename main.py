@@ -12,7 +12,7 @@ from settings_system import load_settings, save_settings
 from skill_tree import SkillTreeState, SkillTreeUI, apply_skill_effects
 from spritesheet import Spritesheet
 from tilemap import *
-from world import World_Generation
+from world import *
 
 # Safely get the brightness argument, default to 50, and keep it between 0 and 100.
 brightness = 50
@@ -148,6 +148,7 @@ zombie_count = 1
 tile_size = 32
 chunk_tiles_x = 16
 chunk_tiles_y = 16
+obstacles = []
 
 chunk_pixel_w = chunk_tiles_x*tile_size
 chunk_pixel_h = chunk_tiles_y*tile_size
@@ -182,9 +183,9 @@ player = Player(
     dash = False,
     dashing = False,
     dash_buffer = 0,
-    max_dash_buffer = 120,
-    max_dash_charges = 2,
-    dash_charges = 2,
+    max_dash_buffer = 120, #120
+    max_dash_charges = 2, #2
+    dash_charges = 2,  #2
     dash_dis = 15,
     dash_counter = 0,
     press_space = False,
@@ -198,7 +199,7 @@ player = Player(
     aim_left = False,
     y_momentum = 0,
     x_momentum = 0,
-    max_air_jumps = 2,
+    max_air_jumps = 50, #50
     jump = False,
     jump_height = 4.5,
     on_ground = None,
@@ -370,14 +371,15 @@ current_shop_perks = []
 purchases_allowed = 1
 current_purchases = 0
 
-spritesheet_pool = ['grass_spritesheet.png','cartoon_spritesheet.png']
+spritesheet_pool = ['asset/grass_spritesheet.png','asset/cartoon_spritesheet.png','asset/plague_spritesheet.png','asset/exclusion_spritesheet.png']
 
 def load_stage(stage_number, saved_seed=None, saved_spritesheet=None, reset_player=True):
-    global current_stage, min_world_chunks, max_world_chunks, loaded_chunks, world, player_rect, current_spritesheet, spritesheet_pool, current_map_seed, spawned_chunks, stage_spawned_zombies, stage_dead_zombies, shop_active, shop_accessed, shop_timer, orbs, shop_message
+    global current_stage, min_world_chunks, max_world_chunks, loaded_chunks, world, player_rect, current_spritesheet, spritesheet_pool, current_map_seed, spawned_chunks, stage_spawned_zombies, stage_dead_zombies, shop_active, shop_accessed, shop_timer, orbs, shop_message, bg 
 
     current_stage = stage_number
     loaded_chunks.clear()
     spawned_chunks.clear()
+    obstacles.clear()
     zombies.clear()
     orbs.clear()
     stage_spawned_zombies = 0
@@ -386,6 +388,8 @@ def load_stage(stage_number, saved_seed=None, saved_spritesheet=None, reset_play
     shop_timer = 0.0
     shop_accessed = False
     shop_message = ""
+
+    world.last_obstacle_col = -999
 
     stage_min_chunk_x = ((stage_number-1)*stage_length) - 1
     stage_max_chunk_x = stage_min_chunk_x + stage_length
@@ -406,12 +410,82 @@ def load_stage(stage_number, saved_seed=None, saved_spritesheet=None, reset_play
         new_seed = random.randint(1,10000)
         current_spritesheet = Spritesheet(spritesheet_pool[map_index])
         spritesheet_pool.pop(map_index)
-    else:
+    elif stage_number == 3:
+        map_index = random.randrange(len(spritesheet_pool))
+        new_seed = random.randint(1,10000)
+        current_spritesheet = Spritesheet(spritesheet_pool[map_index])
+        spritesheet_pool.pop(map_index)
+    elif stage_number == 4:
+        map_index = random.randrange(len(spritesheet_pool))
+        new_seed = random.randint(1,10000)
+        current_spritesheet = Spritesheet(spritesheet_pool[map_index])
+        spritesheet_pool.pop(map_index)
+    elif stage_number == 5:
         new_seed = 69420
-        current_spritesheet = Spritesheet('plague_spritesheet.png')
+        current_spritesheet = Spritesheet('asset/castle_spritesheet.png')
+    else:
+        pygame.quit()
+        sys.exit()
+
 
     current_map_seed = new_seed
 
+    #*--------------------------------------------------------------PARALLAX----------------------------------------------------------------------*
+    if current_spritesheet is not None:
+        active_spritesheet = current_spritesheet.spritesheet
+    bg = ParallaxBackground(base_res_x, base_res_y)
+
+    if active_spritesheet == 'asset/cartoon_spritesheet.png':
+        #ABANDONED CITY (CARTOON SPRITESHEET)
+
+        bg.add_layer('asset/abandoned_city/abandoned_sky.png', scroll_factor=0.0)
+        bg.add_layer('asset/abandoned_city/abandoned_building1.png', scroll_factor=0.2)
+        bg.add_layer('asset/abandoned_city/abandoned_building2.png',scroll_factor=0.2)
+        bg.add_layer('asset/abandoned_city/abandoned_building3.png',scroll_factor=0.2)
+
+    elif active_spritesheet == 'asset/grass_spritesheet.png':
+        #APOCALYPTIC CITY (GRASS SPRITESHEET)
+
+        bg.add_layer('asset/apocalyptic_city/apocalyptic_sky.png', scroll_factor=0.0)
+        bg.add_layer('asset/apocalyptic_city/apocalyptic_building1.png', scroll_factor=0.2)
+        bg.add_layer('asset/apocalyptic_city/apocalyptic_building2.png',scroll_factor=0.2)
+        bg.add_layer('asset/apocalyptic_city/apocalyptic_building3.png',scroll_factor=0.2)
+
+    elif active_spritesheet == 'asset/plague_spritesheet.png':
+        #GHOST TOWN (PLAGUE SPRITESHEET)
+
+        bg.add_layer('asset/ghost_town/ghost_sky.png', scroll_factor=0.0)
+        bg.add_layer('asset/ghost_town/ghost_town_folliage.png', scroll_factor=0.2)
+        bg.add_layer('asset/ghost_town/ghost_town1.png',scroll_factor=0.267)
+        bg.add_layer('asset/ghost_town/ghost_town2.png',scroll_factor=0.267)
+        bg.add_layer('asset/ghost_town/ghost_town_trees.png',scroll_factor=0.367)
+        
+    elif active_spritesheet == 'asset/exclusion_spritesheet.png':
+
+        bg.add_layer('asset/industrial/industrial_bg.png', scroll_factor=0.0)
+        bg.add_layer('asset/industrial/industrial_far_buildings.png', scroll_factor=0.2)
+        bg.add_layer('asset/industrial/industrial_building.png',scroll_factor=0.2)
+        bg.add_layer('asset/industrial/industrial_foreground.png',scroll_factor=0.2)
+
+    elif active_spritesheet == 'asset/castle_spritesheet.png':
+        bg.add_layer('asset/station/station_bg.png', scroll_factor=0.0)
+        bg.add_layer('asset/station/station_detail.png', scroll_factor=0.2)
+        bg.add_layer('asset/station/station_train.png',scroll_factor=0.2)
+        bg.add_layer('asset/station/station_underfloor.png',scroll_factor=0.2)
+        bg.add_layer('asset/station/station_columns.png',scroll_factor=0.2)
+        bg.add_layer('asset/station/station_infopost.png',scroll_factor=0.4)
+        bg.add_layer('asset/station/station_wires.png',scroll_factor=0.2)
+
+
+    print(
+    "GENERATING WORLD:",
+    "stage =", current_stage,
+    "seed =", current_map_seed,
+    "player =", (player.rect.x, player.rect.y)
+    )
+
+    #reinitialise perlin
+    #Surface_Level
     world.noise1d = PerlinNoise(octaves=2, seed = int(new_seed))
     world.noise2d = PerlinNoise(octaves=3, seed = int(new_seed))
 
@@ -494,7 +568,7 @@ def save_current_game():
 
 
 #note for rendering: whatever is first rendered in the loop will be behind while whatever is last rendered in the loop will be in the very front
-# *--GAME LOOP--*
+#*--GAME LOOP--*
 if isinstance(saved_stage, int) and saved_stage >= 1 and saved_seed is not None and saved_spritesheet:
     current_stage = saved_stage
     load_stage(current_stage, saved_seed, saved_spritesheet, reset_player=False)
@@ -1021,8 +1095,12 @@ while True:
             needed_chunks.add(chunk_key)
 
             if chunk_key not in loaded_chunks:
-                raw_data = world.generate_chunk_data(chunk_x,chunk_y)
-                loaded_chunks[chunk_key] = TileMap(raw_data,current_spritesheet, tile_size)
+                tile_grid = world.generate_chunk_data(chunk_x,chunk_y)
+                loaded_chunks[chunk_key] = TileMap(tile_grid,current_spritesheet, tile_size)
+
+                new_obstacles, world.last_obstacle_col = world.generate_chunk_obstacles(chunk_x, chunk_y, tile_grid, world.last_obstacle_col)
+
+                obstacles.extend(new_obstacles)
 
     for chunk_key in list(loaded_chunks.keys()):
         if chunk_key not in needed_chunks:
@@ -1033,6 +1111,14 @@ while True:
         chunk_world_x = chunk_x * chunk_pixel_w
         chunk_world_y = chunk_y * chunk_pixel_h
         tile_rect.extend(tile_map.get_rects(chunk_world_x,chunk_world_y))
+
+    collision_rects = tile_rect.copy()
+    for obstacle in obstacles:
+        if obstacle.solid:
+            collision_rects.append(obstacle.rect)
+
+    # *--------------------------SPAWNING/DESPAWNING ZOMBIES----------------------------------
+
 
     # DESPAWNING ZOMBIES
     despawn_distance = 4 * chunk_pixel_w
@@ -1676,6 +1762,9 @@ while True:
             if y_camera_delay >= 0:
                 y_camera_delay = 0
 
+    
+    effective_camera_x = camera_x + x_camera_delay
+    effective_camera_y = camera_y + y_camera_delay
 
     if abs(screen_shake_x) > 0:
         screen_shake_x *= 0.85
@@ -1687,6 +1776,8 @@ while True:
         if abs(screen_shake_y) < 0.5:
             screen_shake_y = 0
 
+    bg.draw(canvas, effective_camera_x, effective_camera_y)
+
 
     for (chunk_x,chunk_y), tile_map in loaded_chunks.items():
         chunk_world_x = chunk_x * chunk_pixel_w
@@ -1697,6 +1788,10 @@ while True:
     player_render_pos = ((player.rect.x - camera_x) - x_camera_delay, (player.rect.y - camera_y) - y_camera_delay)
 
      
+    for obstacle in obstacles:   
+        obstacle.update(tile_rect)
+        
+        obstacle.draw(canvas, camera_x, camera_y, x_camera_delay, y_camera_delay)
     
     # player_render_pos = ((player.rect.x- camera_x) - x_camera_delay - 48, (player.rect.y-  camera_y) - y_camera_delay -48) #centers player on screen
     # #                                                                                                   ^negative camera delay
